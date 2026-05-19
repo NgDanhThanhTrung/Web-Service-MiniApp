@@ -3,126 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lucky Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        :root { --blue: #007aff; --orange: #f39c12; }
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; }
-        .card { background: #fff; border-radius: 18px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; }
-        .tabs { display: flex; background: #e4e6eb; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
-        .tab { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
-        .tab.active { background: #fff; color: var(--blue); }
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; text-align: center; }
+        .card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .tabs { display: flex; background: #eee; border-radius: 10px; padding: 5px; margin-bottom: 20px; }
+        .tab { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; }
+        .tab.active { background: #007aff; color: #fff; }
         .content { display: none; }
         .content.active { display: block; }
-        #balance { font-size: 36px; font-weight: bold; color: var(--orange); margin: 10px 0; }
-        .btn { background: var(--blue); color: #fff; border: none; padding: 16px; width: 100%; border-radius: 12px; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        .btn { background: #007aff; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; margin-top: 10px; }
         input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        #balance { font-size: 32px; color: #f39c12; margin: 10px 0; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="card">
         <div class="tabs">
-            <div id="t1" class="tab active" onclick="showTab('play', 't1')">🎰 Quay</div>
-            <div id="t2" class="tab" onclick="showTab('ref', 't2')">👥 Bạn bè</div>
-            <div id="t3" class="tab" onclick="showTab('bank', 't3')">🏦 Rút</div>
+            <div class="tab active" onclick="tab('play')">🎰 Chơi</div>
+            <div class="tab" onclick="tab('ref')">👥 Ref</div>
+            <div class="tab" onclick="tab('bank')">🏦 Rút</div>
         </div>
-
         <div id="balance">0 🪙</div>
-        <div id="vnd" style="color: #888; margin-bottom: 20px;">≈ 0 VNĐ</div>
+        <div id="vnd" style="color: gray; margin-bottom: 20px;">≈ 0 VNĐ</div>
 
         <div id="play" class="content active">
-            <p>Lượt Free: <b id="spins">0</b> | QC: <b id="ads">0/15</b></p>
-            <button class="btn" onclick="handleClaim()">NHẬN XU MAY MẮN</button>
+            <p>Lượt: <b id="spins">0</b> | QC: <b id="ads">0/15</b></p>
+            <button class="btn" onclick="handleClaim()">QUAY SỐ</button>
         </div>
 
         <div id="ref" class="content">
-            <p>Nhận <b>10.000 xu</b> khi mời bạn</p>
             <input type="text" id="refUrl" readonly>
             <button class="btn" style="background:#28a745" onclick="share()">MỜI BẠN BÈ</button>
         </div>
 
         <div id="bank" class="content">
-            <select id="method">
-                <option value="momo">Momo</option>
-                <option value="bank">Ngân hàng</option>
-            </select>
-            <input type="number" id="wAmount" placeholder="Số tiền VNĐ">
-            <input type="text" id="wDetails" placeholder="Số tài khoản / SĐT">
-            <button class="btn" style="background:var(--orange)" onclick="withdraw()">XÁC NHẬN RÚT</button>
+            <input type="number" id="wAmount" placeholder="Số VNĐ">
+            <input type="text" id="wDetails" placeholder="SĐT Momo/STK">
+            <button class="btn" style="background:#f39c12" onclick="withdraw()">GỬI LỆNH RÚT</button>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        const user = tg.initDataUnsafe.user;
-        const AdController = window.Adsgram.init({ blockId: "YOUR_ADSGRAM_ID" });
+        let AdController;
+        let botUser;
 
-        async function load() {
+        async function init() {
+            const config = await (await fetch('/api/config')).json();
+            botUser = config.botUsername;
+            if (window.Adsgram) AdController = window.Adsgram.init({ blockId: config.adsgramId });
+
+            const user = tg.initDataUnsafe.user;
             const res = await fetch('/api/status', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    telegramId: user.id.toString(), 
-                    username: user.username, 
-                    name: user.first_name, 
-                    refId: tg.initDataUnsafe.start_param 
-                })
+                body: JSON.stringify({ telegramId: user.id.toString(), username: user.username, name: user.first_name, refId: tg.initDataUnsafe.start_param })
             });
             const d = await res.json();
+            updateUI(d);
+        }
+
+        function updateUI(d) {
             document.getElementById('balance').innerText = d.totalCoins.toLocaleString() + ' 🪙';
             document.getElementById('vnd').innerText = `≈ ${(d.totalCoins/1000).toLocaleString()} VNĐ`;
             document.getElementById('spins').innerText = d.spinsLeft;
             document.getElementById('ads').innerText = d.adsWatchedToday + '/15';
-            // ĐỒNG NHẤT: Link ref trỏ về Bot A
-            document.getElementById('refUrl').value = `https://t.me/TEN_BOT_A_CUA_BAN/app?startapp=${user.id}`;
+            document.getElementById('refUrl').value = `https://t.me/${botUser}/app?startapp=${tg.initDataUnsafe.user.id}`;
         }
 
         async function handleClaim() {
-            const spins = parseInt(document.getElementById('spins').innerText);
-            if (spins > 0) return claim();
-            AdController.show().then(() => claim()).catch(() => alert("Xem hết QC để quay!"));
+            if (parseInt(document.getElementById('spins').innerText) > 0) return claim();
+            AdController.show().then(() => claim()).catch(() => alert("Phải xem hết QC!"));
         }
 
         async function claim() {
-            const res = await fetch('/api/claim', {
+            const res = await (await fetch('/api/claim', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ telegramId: user.id.toString() })
-            });
-            const d = await res.json();
-            if (d.success) { tg.showAlert(`🎁 Bạn nhận được ${d.lucky} xu!`); load(); }
-            else tg.showAlert(d.message);
+                body: JSON.stringify({ telegramId: tg.initDataUnsafe.user.id.toString() })
+            })).json();
+            if (res.success) { alert(`+${res.lucky} xu!`); init(); }
         }
 
         async function withdraw() {
-            const res = await fetch('/api/withdraw', {
+            const res = await (await fetch('/api/withdraw', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    telegramId: user.id.toString(),
+                    telegramId: tg.initDataUnsafe.user.id.toString(),
                     amountVnd: document.getElementById('wAmount').value,
-                    method: document.getElementById('method').value,
+                    method: 'Bank/Momo',
                     details: document.getElementById('wDetails').value
                 })
-            });
-            const d = await res.json();
-            if(d.success) { tg.showAlert("✅ Lệnh rút đã gửi tới Admin!"); load(); }
-            else tg.showAlert(d.message || "Lỗi rút tiền!");
+            })).json();
+            alert(res.success ? "Đã gửi!" : "Không đủ xu!");
+            init();
         }
 
-        function showTab(id, tId) {
+        function tab(id) {
             document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            document.getElementById(tId).classList.add('active');
         }
 
         function share() {
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(document.getElementById('refUrl').value)}&text=Vòng quay nhận xu uy tín!`);
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(document.getElementById('refUrl').value)}&text=Nhận xu ngay!`);
         }
 
-        load();
+        init();
         tg.expand();
     </script>
 </body>
