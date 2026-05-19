@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch'); // Đảm bảo đã npm install node-fetch@2
 const User = require('./models/User');
 
 const app = express();
@@ -10,9 +10,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Kết nối MongoDB (Dùng chung URI với Tài khoản A)
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('✅ Web Server kết nối MongoDB thành công'))
-    .catch(err => console.error('❌ Lỗi DB:', err));
+    .then(() => console.log('✅ Web Server kết nối DB thành công'))
+    .catch(err => console.error('❌ Lỗi kết nối DB:', err));
 
 // --- ROUTE GIAO DIỆN ---
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
@@ -21,31 +22,26 @@ app.get('/', (req, res) => res.redirect('/app'));
 
 // --- API LOGIC ---
 
-// 1. Lấy thông tin User & Xử lý Referral (Ref)
+// 1. Đồng bộ User & Xử lý Referral (Ref)
 app.post('/api/status', async (req, res) => {
     const { telegramId, username, name, refId } = req.body;
     const today = new Date().toDateString();
 
     try {
         let user = await User.findOne({ telegramId });
-
         if (!user) {
-            // Tạo mới người dùng
             user = new User({ telegramId, username, name });
-            
-            // Nếu có refId (người giới thiệu)
             if (refId && refId !== telegramId) {
-                const referrer = await User.findOne({ telegramId: refId });
-                if (referrer) {
-                    referrer.totalCoins += 10000; // Thưởng 10k xu cho người mời
-                    referrer.refs += 1;
-                    await referrer.save();
-                    user.spinsLeft += 2; // Thưởng 2 lượt quay cho người mới
+                const boss = await User.findOne({ telegramId: refId });
+                if (boss) {
+                    boss.totalCoins += 10000;
+                    boss.refs += 1;
+                    await boss.save();
+                    user.spinsLeft += 2;
                 }
             }
             await user.save();
         } else {
-            // Reset lượt xem quảng cáo nếu sang ngày mới
             if (user.lastActiveDay !== today) {
                 user.adsWatchedToday = 0;
                 user.lastActiveDay = today;
@@ -53,34 +49,28 @@ app.post('/api/status', async (req, res) => {
             }
         }
         res.json(user);
-    } catch (err) { res.status(500).json({ error: "Server Error" }); }
+    } catch (err) { res.status(500).json({ error: "Lỗi Server" }); }
 });
 
-// 2. Xử lý Claim Xu (Vòng quay hoặc Quảng cáo)
+// 2. Xử lý Claim Xu (Vòng quay/Adsgram)
 app.post('/api/claim', async (req, res) => {
     const { telegramId } = req.body;
     try {
         const user = await User.findOne({ telegramId });
         if (!user) return res.status(404).json({ success: false });
 
-        if (user.spinsLeft > 0) {
-            user.spinsLeft--;
-        } else if (user.adsWatchedToday < 15) {
-            user.adsWatchedToday++;
-        } else {
-            return res.json({ success: false, message: "Hết lượt hôm nay!" });
-        }
+        if (user.spinsLeft > 0) user.spinsLeft--;
+        else if (user.adsWatchedToday < 15) user.adsWatchedToday++;
+        else return res.json({ success: false, message: "Hết lượt!" });
 
-        // Tỷ lệ nhận xu: 500 - 50,000
         const lucky = Math.floor(Math.random() * (50000 - 500 + 1)) + 500;
         user.totalCoins += lucky;
         await user.save();
-
         res.json({ success: true, lucky, user });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 3. Xử lý Rút tiền & Gửi thông báo cho Admin qua Bot
+// 3. API Rút tiền: Gửi thông báo về ADMIN (Không dùng Telegraf để tránh xung đột)
 app.post('/api/withdraw', async (req, res) => {
     const { telegramId, amountVnd, method, details } = req.body;
     const { BOT_TOKEN, ADMIN_ID } = process.env;
@@ -94,29 +84,27 @@ app.post('/api/withdraw', async (req, res) => {
         user.totalCoins -= cost;
         await user.save();
 
-        // Gửi thông báo về Telegram cho bạn (Admin)
-        const msg = `💰 **YÊU CẦU RÚT TIỀN**\n` +
-                    `━━━━━━━━━━━━━━━\n` +
-                    `👤 Khách: ${user.name} (@${user.username || 'n/a'})\n` +
-                    `💵 Số tiền: ${Number(amountVnd).toLocaleString()} VNĐ\n` +
-                    `🏦 Cổng: ${method.toUpperCase()}\n` +
-                    `📝 STK: \`${details}\`\n` +
-                    `━━━━━━━━━━━━━━━\n` +
-                    `🚀 Hãy xử lý lệnh rút này!`;
+        // Gửi thông báo cho Admin bằng HTTP Request (Outbound)
+        const text = `💰 **YÊU CẦU RÚT TIỀN**\n` +
+                     `👤 Khách: ${user.name} (@${user.username})\n` +
+                     `💵 Số tiền: ${Number(amountVnd).toLocaleString()} VNĐ\n` +
+                     `🏦 Cổng: ${method.toUpperCase()}\n` +
+                     `📝 Chi tiết: \`${details}\``;
 
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+        await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: ADMIN_ID, text: msg, parse_mode: 'Markdown' })
+            body: JSON.stringify({ chat_id: ADMIN_ID, text, parse_mode: 'Markdown' })
         });
 
         res.json({ success: true, totalCoins: user.totalCoins });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 4. API Quản trị (Dành cho trang /account)
+// 4. API Admin cho trang /account
 app.get('/api/admin/users', async (req, res) => {
-    if (req.query.pass !== process.env.ADMIN_PASS) return res.status(403).send("Forbidden");
+    if (req.query.pass !== process.env.ADMIN_PASS) return res.sendStatus(403);
     const users = await User.find({}).sort({ totalCoins: -1 });
     res.json(users);
 });
