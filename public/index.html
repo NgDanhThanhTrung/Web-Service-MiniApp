@@ -9,71 +9,67 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header class="main-header">
-        <div class="user-row">
-            <div id="avatar">👤</div>
-            <div class="user-text">
-                <div id="display-name">Người dùng</div>
-                <div id="display-username">@username</div>
+    <header class="header">
+        <div class="user-info">
+            <div id="avatar">?</div>
+            <div class="meta">
+                <div id="u-name">Đang tải...</div>
+                <div id="u-username">@username</div>
             </div>
         </div>
         <div class="balance-card">
-            <small>SỐ DƯ HIỆN TẠI</small>
-            <h1 id="txt-balance">0</h1>
-            <p id="txt-vnd">≈ 0 VNĐ</p>
+            <p>SỐ DƯ COINS</p>
+            <h1 id="balance">0</h1>
+            <p id="vnd">≈ 0 VNĐ</p>
         </div>
     </header>
 
-    <main class="content">
-        <div class="stats">
-            <div class="stat"><span>Lượt Free</span><b id="txt-spins">0</b></div>
-            <div class="stat"><span>Ads/Ngày</span><b id="txt-ads">0/15</b></div>
-        </div>
+    <div class="stats">
+        <div class="stat">Free: <b id="spins">0</b></div>
+        <div class="stat">Ads: <b id="ads">0/15</b></div>
+    </div>
 
-        <button class="btn-main" onclick="handleAction(false)">🎁 NHẬN XU FREE</button>
-        <button class="btn-ads" onclick="showAds()">📺 XEM QUẢNG CÁO (+1 Lượt)</button>
+    <div class="actions">
+        <button class="btn-main" onclick="claim(false)">🎁 NHẬN XU FREE</button>
+        <button class="btn-ads" onclick="showAds()">📺 XEM ADS NHẬN XU</button>
+    </div>
 
-        <nav class="bottom-nav">
-            <div class="nav-item active"><span>🎡</span><small>Chơi</small></div>
-            <div class="nav-item" onclick="tg.showAlert('Tính năng sắp ra mắt!')"><span>👥</span><small>Mời bạn</small></div>
-            <div class="nav-item" onclick="tg.showAlert('Chức năng rút tiền đang bảo trì!')"><span>💳</span><small>Ví</small></div>
-        </nav>
-    </main>
+    <nav class="nav">
+        <div class="nav-item active">🎰 Chơi</div>
+        <div class="nav-item" onclick="tg.showAlert('Tính năng Referral đang nâng cấp!')">👥 Bạn bè</div>
+        <div class="nav-item" onclick="window.location.href='/account'">⚙️ Admin</div>
+    </nav>
 
     <script>
         const tg = window.Telegram.WebApp;
         const user = tg.initDataUnsafe.user;
-        let AdController;
+        let ads;
 
         async function init() {
             const cfg = await (await fetch('/api/config')).json();
-            if (window.Adsgram) AdController = window.Adsgram.init({ blockId: cfg.adsgramId });
-            loadData();
+            if (window.Adsgram) ads = window.Adsgram.init({ blockId: cfg.adsgramId });
+            update();
         }
 
-        async function loadData() {
-            if(!user) return;
+        async function update() {
+            if (!user) return;
             const res = await fetch('/api/status', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    telegramId: user.id.toString(),
-                    username: user.username,
-                    name: user.first_name
-                })
+                body: JSON.stringify({ telegramId: user.id.toString(), username: user.username, name: user.first_name })
             });
             const d = await res.json();
-            document.getElementById('display-name').innerText = d.name;
-            document.getElementById('display-username').innerText = d.username !== 'n/a' ? '@'+d.username : '';
+            document.getElementById('u-name').innerText = d.name;
+            document.getElementById('u-username').innerText = d.username !== 'n/a' ? '@'+d.username : '';
             document.getElementById('avatar').innerText = d.name.charAt(0).toUpperCase();
-            document.getElementById('txt-balance').innerText = d.totalCoins.toLocaleString();
-            document.getElementById('txt-vnd').innerText = `≈ ${(d.totalCoins/1000).toLocaleString()} VNĐ`;
-            document.getElementById('txt-spins').innerText = d.spinsLeft;
-            document.getElementById('txt-ads').innerText = d.adsWatchedToday + '/15';
+            document.getElementById('balance').innerText = d.totalCoins.toLocaleString();
+            document.getElementById('vnd').innerText = `≈ ${(d.totalCoins/1000).toLocaleString()} VNĐ`;
+            document.getElementById('spins').innerText = d.spinsLeft;
+            document.getElementById('ads').innerText = d.adsWatchedToday + '/15';
         }
 
-        async function handleAction(isAds) {
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        async function claim(isAds) {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             const res = await fetch('/api/claim', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -81,15 +77,14 @@
             });
             const r = await res.json();
             if (r.success) {
-                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                tg.showAlert(`🎉 Chúc mừng! Bạn nhận được ${r.lucky.toLocaleString()} xu.`);
-                loadData();
+                tg.showAlert(`🎉 +${r.lucky.toLocaleString()} xu!`);
+                update();
             } else tg.showAlert(r.message);
         }
 
         function showAds() {
-            if (!AdController) return tg.showAlert("QC chưa tải xong!");
-            AdController.show().then(() => handleAction(true)).catch(() => tg.showAlert("Bạn chưa xem hết QC!"));
+            if (!ads) return tg.showAlert("QC chưa sẵn sàng");
+            ads.show().then(() => claim(true)).catch(() => tg.showAlert("Bạn chưa xem hết QC"));
         }
 
         init(); tg.expand();
