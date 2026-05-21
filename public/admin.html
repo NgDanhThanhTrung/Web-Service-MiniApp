@@ -1,34 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
     <title>Admin Panel</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; }
-        .box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background: #0088cc; color: white; }
+        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; }
+        .box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background: #2481cc; color: white; }
     </style>
 </head>
 <body>
     <div class="box">
         <h2>👥 Quản lý người dùng</h2>
-        <input type="password" id="pass" placeholder="Admin Pass">
-        <button onclick="load()">Tải dữ liệu</button>
-        <table id="tbl">
-            <thead><tr><th>Tên</th><th>Username</th><th>Số dư</th></tr></thead>
+        <input type="password" id="pass" placeholder="Admin Password">
+        <button onclick="loadUsers()">Tải dữ liệu</button>
+        <table>
+            <thead><tr><th>Telegram ID</th><th>Tên</th><th>Số dư</th></tr></thead>
             <tbody id="list"></tbody>
         </table>
     </div>
     <script>
-        async function load() {
+        async function loadUsers() {
             const p = document.getElementById('pass').value;
             const res = await fetch(`/api/admin/users?pass=${p}`);
-            if (res.status === 403) return alert("Sai mã!");
+            if(res.status === 403) return alert("Sai mật khẩu!");
             const data = await res.json();
             document.getElementById('list').innerHTML = data.map(u => `
-                <tr><td>${u.name}</td><td>@${u.username}</td><td><b>${u.totalCoins.toLocaleString()}</b></td></tr>
+                <tr><td>${u.telegramId}</td><td>${u.name} (@${u.username})</td><td><b>${u.totalCoins.toLocaleString()}</b></td></tr>
             `).join('');
         }
     </script>
