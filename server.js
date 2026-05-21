@@ -37,7 +37,7 @@ app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admi
 
 app.get('/api/config', (req, res) => {
     res.json({ 
-        blockId: ADSGRAM_BLOCK_ID || "30869", // Mặc định ID bạn đã khởi tạo
+        blockId: ADSGRAM_BLOCK_ID || "30869", 
         botUser: BOT_USERNAME 
     });
 });
@@ -49,10 +49,11 @@ app.post('/api/user-status', async (req, res) => {
         const today = new Date().toISOString().split('T')[0];
 
         if (!user) {
+            // CẬP NHẬT: Khởi tạo 5 lượt quay cho người dùng mới
             user = new User({ 
                 id, first_name, username, 
                 lastActiveDate: today, 
-                spinsLeft: 10,
+                spinsLeft: 5, 
                 adsWatched: 0,
                 coins: 0
             });
@@ -61,13 +62,14 @@ app.post('/api/user-status', async (req, res) => {
                 const inviter = await User.findOne({ id: parseInt(start_param) });
                 if (inviter) {
                     inviter.coins += 100000;
-                    inviter.refs += 1;
+                    inviter.refs = (inviter.refs || 0) + 1;
                     await inviter.save();
                 }
             }
             await user.save();
         } else if (user.lastActiveDate !== today) {
-            user.spinsLeft = 10;
+            // CẬP NHẬT: Hồi 5 lượt quay mỗi ngày
+            user.spinsLeft = 5;
             user.lastActiveDate = today;
             await user.save();
         }
@@ -76,7 +78,6 @@ app.post('/api/user-status', async (req, res) => {
 });
 
 // --- CALLBACK QUẢNG CÁO TỪ ADSGRAM ---
-// Reward URL bạn khai báo trên Adsgram: https://web-service-miniapp.onrender.com/api/ads-callback?userId=[userId]
 app.get('/api/ads-callback', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).send('Missing userId');
@@ -84,18 +85,19 @@ app.get('/api/ads-callback', async (req, res) => {
     try {
         const user = await User.findOne({ id: parseInt(userId) });
         if (user) {
-            // Thưởng ngẫu nhiên khi xem xong QC thành công qua callback
+            // Thưởng ngẫu nhiên từ 500 đến 50.000 xu
             const lucky = Math.floor(Math.random() * 49501) + 500;
             user.coins += lucky;
             user.adsWatched = (user.adsWatched || 0) + 1;
             await user.save();
             
-            console.log(`✅ User ${userId} đã nhận thưởng từ Adsgram Callback`);
-            res.send('OK'); // Phản hồi cho Adsgram
+            console.log(`✅ User ${userId} xem QC thành công. Nhận: ${lucky} xu. Tổng QC: ${user.adsWatched}`);
+            res.send('OK'); 
         } else {
             res.status(404).send('User not found');
         }
     } catch (error) {
+        console.error('❌ Ads Callback Error:', error);
         res.status(500).send('Server Error');
     }
 });
@@ -103,68 +105,84 @@ app.get('/api/ads-callback', async (req, res) => {
 // API thực hiện hành động quay (Spin)
 app.post('/api/action', async (req, res) => {
     const { id, action } = req.body;
-    const user = await User.findOne({ id });
-    if (!user) return res.json({ ok: false });
+    try {
+        const user = await User.findOne({ id });
+        if (!user) return res.json({ ok: false, msg: "Người dùng không tồn tại" });
 
-    if (action === 'spin') {
-        if (user.spinsLeft <= 0) return res.json({ ok: false, msg: "Hết lượt quay" });
-        const lucky = Math.floor(Math.random() * 49501) + 500;
-        user.coins += lucky;
-        user.spinsLeft -= 1;
-        await user.save();
-        return res.json({ ok: true, lucky });
+        if (action === 'spin') {
+            if (user.spinsLeft <= 0) return res.json({ ok: false, msg: "Bạn đã hết lượt quay hôm nay!" });
+            
+            const lucky = Math.floor(Math.random() * 49501) + 500;
+            user.coins += lucky;
+            user.spinsLeft -= 1;
+            await user.save();
+            return res.json({ ok: true, lucky });
+        }
+        res.json({ ok: false, msg: "Hành động không hợp lệ" });
+    } catch (e) {
+        res.json({ ok: false, msg: "Lỗi hệ thống" });
     }
-    
-    res.json({ ok: false });
 });
 
 // API Rút tiền
 app.post('/api/withdraw', async (req, res) => {
     const { id, amountXu, method, address } = req.body;
-    const user = await User.findOne({ id });
+    try {
+        const user = await User.findOne({ id });
+        if (!user) return res.json({ ok: false, msg: "Lỗi xác thực người dùng" });
 
-    if (!user) return res.json({ ok: false, msg: "Lỗi người dùng" });
+        // Kiểm tra điều kiện 5 quảng cáo
+        const currentAds = user.adsWatched || 0;
+        if (currentAds < 5) {
+            return res.json({ ok: false, msg: `Bạn cần xem đủ 5 quảng cáo để rút tiền (Hiện tại: ${currentAds}/5)` });
+        }
 
-    if ((user.adsWatched || 0) < 5) {
-        return res.json({ ok: false, msg: `Cần xem ít nhất 5 QC (Hiện có: ${user.adsWatched}/5)` });
+        // Kiểm tra số dư và mức rút tối thiểu
+        if (!amountXu || amountXu < 300000) {
+            return res.json({ ok: false, msg: "Hạn mức rút tối thiểu là 300.000 XU" });
+        }
+
+        if (user.coins < amountXu) {
+            return res.json({ ok: false, msg: "Số dư tài khoản không đủ để thực hiện lệnh này" });
+        }
+
+        // Trừ tiền và tạo lệnh rút
+        user.coins -= amountXu;
+        await user.save();
+
+        const newRequest = new Withdraw({ 
+            userId: id, 
+            name: user.first_name, 
+            amountXu, 
+            method, 
+            address 
+        });
+        await newRequest.save();
+        
+        res.json({ ok: true });
+    } catch (e) {
+        res.json({ ok: false, msg: "Lỗi trong quá trình xử lý rút tiền" });
     }
-
-    if (amountXu < 300000) {
-        return res.json({ ok: false, msg: "Tối thiểu rút 300.000 XU" });
-    }
-
-    if (user.coins < amountXu) {
-        return res.json({ ok: false, msg: "Số dư xu không đủ" });
-    }
-
-    user.coins -= amountXu;
-    await user.save();
-
-    const newRequest = new Withdraw({ 
-        userId: id, 
-        name: user.first_name, 
-        amountXu, 
-        method, 
-        address 
-    });
-    await newRequest.save();
-    res.json({ ok: true });
 });
 
 // --- ADMIN API ---
 
 app.get('/api/admin/all-data', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.sendStatus(403);
-    const users = await User.find().sort({ coins: -1 }).limit(100);
-    const withdraws = await Withdraw.find().sort({ createdAt: -1 });
-    res.json({ users, withdraws });
+    try {
+        const users = await User.find().sort({ coins: -1 }).limit(100);
+        const withdraws = await Withdraw.find().sort({ createdAt: -1 });
+        res.json({ users, withdraws });
+    } catch (e) { res.status(500).send("Admin Data Error"); }
 });
 
 app.post('/api/admin/approve-withdraw', async (req, res) => {
     if (req.body.pass !== ADMIN_PASS) return res.sendStatus(403);
-    await Withdraw.findByIdAndUpdate(req.body.id, { status: 'Đã thanh toán' });
-    res.json({ ok: true });
+    try {
+        await Withdraw.findByIdAndUpdate(req.body.id, { status: 'Đã thanh toán' });
+        res.json({ ok: true });
+    } catch (e) { res.status(500).send("Approve Error"); }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server đang chạy tại cổng ${PORT}`));
