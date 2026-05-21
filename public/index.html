@@ -9,43 +9,27 @@
     <style>
         :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
-        
         .header { text-align: center; margin-bottom: 20px; }
         .user-info { color: var(--gold); font-size: 14px; margin-bottom: 10px; font-weight: bold; }
-        
         .balance-card { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        
-        /* Giao diện Task Card mới */
         .task-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
-        .task-card { 
-            background: var(--card); border: 1px solid #333; border-radius: 20px; 
-            padding: 15px; display: flex; align-items: center; gap: 15px; 
-            transition: 0.2s; cursor: pointer; 
-        }
+        .task-card { background: var(--card); border: 1px solid #333; border-radius: 20px; padding: 15px; display: flex; align-items: center; gap: 15px; transition: 0.2s; cursor: pointer; }
         .task-card:active { transform: scale(0.98); background: #2b3139; }
         .task-icon { font-size: 24px; width: 45px; height: 45px; background: rgba(241,185,12,0.1); display: flex; align-items: center; justify-content: center; border-radius: 12px; }
         .task-info { flex: 1; }
         .task-info h3 { margin: 0; font-size: 15px; color: var(--gold); }
         .task-info p { margin: 3px 0 0; font-size: 11px; color: #848e9c; }
         .task-action { background: var(--blue); color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; }
-
-        .tabs { 
-            display: flex; gap: 8px; background: var(--card); padding: 10px 15px; 
-            position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
-            border-top: 1px solid #333; padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px));
-        }
+        .tabs { display: flex; gap: 8px; background: var(--card); padding: 10px 15px; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; border-top: 1px solid #333; padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px)); }
         .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 20px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 13px; }
         .tab-btn.active { background: #2b3139; color: var(--gold); font-weight: bold; }
-
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .main { padding-bottom: 100px; }
-
         .soft-input { width: 100%; padding: 15px; border-radius: 20px; border: 1px solid #333; background: #1e2329; color: white; margin-bottom: 15px; box-sizing: border-box; outline: none; font-size: 14px; }
         .progress-box { background: var(--card); padding: 15px; border-radius: 20px; margin-bottom: 15px; text-align: center; border: 1px dashed #444; }
         .bar-bg { width: 100%; height: 10px; background: #000; border-radius: 10px; margin-top: 10px; overflow: hidden; }
         #bar-fill { width: 0%; height: 100%; background: var(--gold); transition: 1s cubic-bezier(0.4, 0, 0.2, 1); }
-
         .btn-soft { padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; width: 100%; }
         .btn-main { background: var(--gold); color: black; }
     </style>
@@ -99,7 +83,7 @@
                 <div class="progress-box" style="border-color: var(--gold); border-style: solid;">
                     <h3 style="color: var(--gold); margin-top:0;">🎁 Mời Bạn Bè</h3>
                     <p style="font-size: 12px; color: #848e9c;">Nhận 100k Xu mỗi lượt mời thành công.</p>
-                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center;">
+                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center;" value="Đang tạo link...">
                     <button class="btn-soft btn-main" onclick="copyLink()">SAO CHÉP LINK</button>
                 </div>
             </div>
@@ -133,24 +117,32 @@
         const tg = window.Telegram.WebApp;
         const rawUser = tg.initDataUnsafe.user || { id: 0, first_name: "Guest", username: "guest" };
         
-        // --- CONFIG ADSGRAM IDS ---
+        // --- CONFIG ADSGRAM (Đã sửa lỗi int- và task-) ---
         const ADS_CONFIG = {
-            video: "30955",          // Thay bằng ID thật loại Video
-            interstitial: "int-30961",   // Thay bằng ID thật loại Toàn màn hình
-            banner: "task-30959"          // Thay bằng ID thật loại Banner
+            video: "30955",          
+            interstitial: "int-30961", // BẮT BUỘC có int-
+            banner: "30959"            // KHÔNG ĐƯỢC có task-
         };
 
         async function init() {
             document.getElementById('u-name').innerText = rawUser.first_name;
             document.getElementById('u-user').innerText = rawUser.username || "n/a";
             
+            // 1. Link mời dự phòng nếu API config lỗi
+            const botUser = "Super_KiemXu_Bot"; // THAY TÊN BOT CỦA BẠN VÀO ĐÂY
+            document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
+
+            // 2. Thử lấy link từ Server
             try {
-                const config = await (await fetch('/api/config')).json();
-                document.getElementById('ref-link').value = `https://t.me/${config.botUser}/app?startapp=${rawUser.id}`;
-            } catch (e) {}
+                const configRes = await fetch('/api/config');
+                const config = await configRes.json();
+                if (config.botUser) {
+                    document.getElementById('ref-link').value = `https://t.me/${config.botUser}/app?startapp=${rawUser.id}`;
+                }
+            } catch (e) { console.log("Dùng link dự phòng"); }
 
             updateUI();
-            setupAutoAds(); // Khởi động tự động 5 phút
+            setupAutoAds();
         }
 
         async function updateUI() {
@@ -162,20 +154,16 @@
                 });
                 const userData = await res.json();
                 
-                const coins = userData.totalCoins || 0;
-                const ads = userData.adsWatchedToday || 0;
-
-                document.getElementById('b-coins').innerText = coins.toLocaleString() + " XU";
-                document.getElementById('b-vnd').innerText = `≈ ${(coins/1000).toLocaleString()} VNĐ`;
+                document.getElementById('b-coins').innerText = (userData.totalCoins || 0).toLocaleString() + " XU";
+                document.getElementById('b-vnd').innerText = `≈ ${( (userData.totalCoins || 0)/1000 ).toLocaleString()} VNĐ`;
                 document.getElementById('s-free').innerText = userData.spinsLeft || 0;
-                document.getElementById('count-ads').innerText = ads;
+                document.getElementById('count-ads').innerText = userData.adsWatchedToday || 0;
                 
-                const progress = Math.min((ads / 5) * 100, 100);
+                const progress = Math.min(((userData.adsWatchedToday || 0) / 5) * 100, 100);
                 document.getElementById('bar-fill').style.width = progress + '%';
             } catch (e) {}
         }
 
-        // HÀM CHẠY QUẢNG CÁO THEO LOẠI
         function triggerAd(type) {
             const blockId = ADS_CONFIG[type];
             if (!window.Adsgram) return;
@@ -186,19 +174,17 @@
             });
 
             AdController.show().then(() => {
-                tg.showAlert(`✅ Đã xem xong ${type}! Vui lòng chờ cộng xu...`);
-                setTimeout(updateUI, 2500);
-            }).catch(() => {
-                tg.showAlert("Hết quảng cáo hoặc lỗi tải. Thử lại sau nhé!");
+                tg.showAlert(`✅ Đã xem xong ${type}! Vui lòng chờ vài giây để cộng xu...`);
+                // Cập nhật lại xu sau khi callback hoàn tất
+                setTimeout(updateUI, 3000); 
+                setTimeout(updateUI, 7000); 
+            }).catch((e) => {
+                tg.showAlert("Quảng cáo lỗi hoặc bị đóng sớm. Thử lại nhé!");
             });
         }
 
-        // TỰ ĐỘNG CHẠY INTERSTITIAL MỖI 5 PHÚT
         function setupAutoAds() {
-            setInterval(() => {
-                console.log("Auto triggering interstitial...");
-                triggerAd('interstitial');
-            }, 5 * 60 * 1000); 
+            setInterval(() => { triggerAd('interstitial'); }, 5 * 60 * 1000); 
         }
 
         async function claim(type) {
@@ -218,6 +204,7 @@
             const amount = document.getElementById('w-amount').value;
             const info = document.getElementById('w-info').value;
             const method = document.getElementById('w-method').value;
+            if(!amount || !info) return tg.showAlert("Vui lòng nhập đủ thông tin!");
 
             const res = await fetch('/api/withdraw', {
                 method: 'POST',
@@ -226,7 +213,7 @@
             });
             const r = await res.json();
             if(r.ok) {
-                tg.showAlert("🚀 Đã gửi yêu cầu! Vui lòng chờ Admin duyệt.");
+                tg.showAlert("🚀 Đã gửi yêu cầu! Chờ Admin duyệt.");
                 updateUI();
             } else tg.showAlert(r.msg);
         }
@@ -242,6 +229,7 @@
         function copyLink() {
             const el = document.getElementById('ref-link');
             el.select();
+            el.setSelectionRange(0, 99999);
             document.execCommand('copy');
             tg.showAlert("📋 Đã sao chép link mời!");
         }
