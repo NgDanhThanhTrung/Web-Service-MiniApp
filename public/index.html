@@ -3,134 +3,226 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lucky Spin Mini App</title>
+    <title>Sieu Cap Kiem Xu</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        /* [Giữ nguyên CSS cũ của bạn ở đây] */
-        :root { --tg-theme-bg: #f0f2f5; --main-color: #0088cc; --accent-color: #f39c12; --text-color: #222; }
-        body { font-family: sans-serif; background-color: var(--tg-theme-bg); padding: 15px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 400px; background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-        .tabs { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 20px; }
-        .tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; border-radius: 10px; cursor: pointer; }
-        .tab.active { background: #fff; color: var(--main-color); font-weight: bold; }
-        .content { display: none; }
-        .content.active { display: block; }
-        .btn { background-color: var(--main-color); color: white; border: none; padding: 16px; width: 100%; border-radius: 14px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #balance { font-size: 40px; font-weight: 800; color: var(--accent-color); margin: 5px 0; text-align: center; }
-        input, select { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; }
+        :root {
+            --tg-bg: var(--tg-theme-bg-color, #0f172a);
+            --tg-secondary: var(--tg-theme-secondary-bg-color, #1e293b);
+            --tg-text: var(--tg-theme-text-color, #ffffff);
+            --accent: #3b82f6;
+            --gold: #fbbf24;
+        }
+
+        body {
+            font-family: -apple-system, sans-serif;
+            background: var(--tg-bg);
+            color: var(--tg-text);
+            margin: 0; padding-bottom: 80px;
+            overflow-x: hidden;
+        }
+
+        /* Header phong cách hiện đại */
+        .header {
+            background: linear-gradient(135deg, #2563eb, #1d4b73);
+            padding: 30px 20px;
+            text-align: center;
+            border-bottom-left-radius: 35px;
+            border-bottom-right-radius: 35px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .balance-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1.5px; }
+        .balance-val { font-size: 38px; font-weight: 800; color: var(--gold); margin: 5px 0; }
+
+        .content { padding: 20px; }
+        .card {
+            background: var(--tg-secondary);
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .btn-main {
+            background: #3b82f6; color: #fff; border: none;
+            width: 100%; padding: 18px; border-radius: 16px;
+            font-size: 18px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        .btn-main:active { transform: scale(0.98); }
+
+        /* Bottom Nav Bar */
+        .bottom-nav {
+            position: fixed; bottom: 0; width: 100%;
+            background: var(--tg-secondary);
+            display: flex; height: 70px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+        .nav-item {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 12px; opacity: 0.6;
+        }
+        .nav-item.active { color: var(--accent); opacity: 1; font-weight: bold; }
+        .nav-icon { font-size: 22px; margin-bottom: 4px; }
+
+        .hidden { display: none; }
+        input, select {
+            width: 100%; padding: 15px; margin: 10px 0;
+            background: rgba(0,0,0,0.2); border: 1px solid #334155;
+            border-radius: 12px; color: #fff; box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('play')">🎰 Chơi</div>
-            <div class="tab" onclick="switchTab('ref')">👥 Bạn bè</div>
-            <div class="tab" onclick="switchTab('bank')">🏦 Rút tiền</div>
+
+    <header class="header">
+        <div class="balance-label">Tài khoản khả dụng</div>
+        <div id="balance" class="balance-val">0 🪙</div>
+        <div id="vnd" style="opacity: 0.8; font-size: 14px;">≈ 0 VNĐ</div>
+    </header>
+
+    <div class="content">
+        <div id="tab-play" class="tab-content">
+            <div class="card" style="display: flex; justify-content: space-around; text-align: center;">
+                <div><small style="opacity: 0.6;">Lượt Free</small><div id="spins" style="font-size: 20px; font-weight: bold; color: var(--accent);">0</div></div>
+                <div><small style="opacity: 0.6;">Đã xem Ads</small><div id="ads" style="font-size: 20px; font-weight: bold; color: #f87171;">0/15</div></div>
+            </div>
+            <button class="btn-main" onclick="handleClaim()">NHẬN XU NGAY</button>
+            <p style="text-align: center; font-size: 12px; opacity: 0.5; margin-top: 15px;">Mẹo: Hết lượt free hãy xem quảng cáo để nhận thêm!</p>
         </div>
 
-        <div id="balance">0 🪙</div>
-
-        <div id="play" class="content active">
-            <p>Lượt Free: <b id="spins">0</b> | QC: <b id="ads">0/15</b></p>
-            <button class="btn" onclick="handleAction()">BẮT ĐẦU NHẬN XU</button>
+        <div id="tab-ref" class="tab-content hidden">
+            <div class="card">
+                <h3>👥 Mời Bạn Bè</h3>
+                <p style="font-size: 14px; opacity: 0.7;">Nhận 10.000 xu cho mỗi bạn bè tham gia.</p>
+                <input type="text" id="ref-url" readonly onclick="this.select()">
+                <button class="btn-main" style="background: #10b981; box-shadow: none;" onclick="copyRef()">COPY LINK MỜI</button>
+            </div>
         </div>
 
-        <div id="ref" class="content">
-            <p>Mời bạn bè nhận 10.000 xu!</p>
-            <input type="text" id="ref-url" readonly onclick="this.select()">
-            <button class="btn" style="background:#28a745" onclick="shareRef()">GỬI LINK MỜI</button>
-        </div>
-
-        <div id="bank" class="content">
-            <select id="w-method">
-                <option value="Momo">Momo</option>
-                <option value="ATM">Ngân hàng</option>
-            </select>
-            <input type="number" id="w-amount" placeholder="Số tiền VNĐ">
-            <input type="text" id="w-details" placeholder="SĐT hoặc Số tài khoản">
-            <button class="btn" style="background:#f39c12" onclick="processWithdraw()">RÚT TIỀN</button>
+        <div id="tab-withdraw" class="tab-content hidden">
+            <div class="card">
+                <h3>💳 Rút Tiền</h3>
+                <select id="w-method">
+                    <option value="Momo">Ví Momo</option>
+                    <option value="Bank">Ngân Hàng</option>
+                </select>
+                <input type="number" id="w-amount" placeholder="Số tiền VNĐ">
+                <input type="text" id="w-details" placeholder="Số điện thoại hoặc Số tài khoản">
+                <button class="btn-main" style="background: var(--gold); box-shadow: none; color: #000;" onclick="doWithdraw()">GỬI YÊU CẦU</button>
+            </div>
         </div>
     </div>
 
+    <nav class="bottom-nav">
+        <div id="n-play" class="nav-item active" onclick="switchTab('play')"><span class="nav-icon">🎰</span>Chơi</div>
+        <div id="n-ref" class="nav-item" onclick="switchTab('ref')"><span class="nav-icon">👥</span>Bạn bè</div>
+        <div id="n-withdraw" class="nav-item" onclick="switchTab('withdraw')"><span class="nav-icon">💳</span>Ví</div>
+    </nav>
+
     <script>
         const tg = window.Telegram.WebApp;
-        const userData = tg.initDataUnsafe.user;
-        let AdController;
-        let botName = "";
+        const user = tg.initDataUnsafe.user;
+        let adController, botName = "";
 
-        async function initApp() {
-            const config = await (await fetch('/api/config')).json();
-            botName = config.botUsername;
-            if (window.Adsgram) AdController = window.Adsgram.init({ blockId: config.adsgramId });
-            loadUserData();
+        // 1. Khởi tạo đồng bộ
+        async function init() {
+            const cfg = await (await fetch('/api/config')).json();
+            botName = cfg.botUsername;
+            if (window.Adsgram) adController = window.Adsgram.init({ blockId: cfg.adsgramId });
+            updateStatus();
         }
 
-        async function loadUserData() {
-            if (!userData) return;
+        // 2. Tải dữ liệu & Nhận diện Telegram
+        async function updateStatus() {
+            if (!user) return;
             const res = await fetch('/api/status', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    telegramId: userData.id.toString(),
-                    username: userData.username || "n/a",
-                    name: userData.first_name,
-                    refId: tg.initDataUnsafe.start_param 
+                    telegramId: user.id.toString(),
+                    username: user.username || "n/a",
+                    name: user.first_name,
+                    refId: tg.initDataUnsafe.start_param
                 })
             });
-            const data = await res.json();
-            document.getElementById('balance').innerText = data.totalCoins.toLocaleString() + ' 🪙';
-            document.getElementById('spins').innerText = data.spinsLeft;
-            document.getElementById('ads').innerText = data.adsWatchedToday + '/15';
-            document.getElementById('ref-url').value = `https://t.me/${botName}/app?startapp=${userData.id}`;
+            const d = await res.json();
+            document.getElementById('balance').innerText = d.totalCoins.toLocaleString() + ' 🪙';
+            document.getElementById('vnd').innerText = `≈ ${(d.totalCoins/1000).toLocaleString()} VNĐ`;
+            document.getElementById('spins').innerText = d.spinsLeft;
+            document.getElementById('ads').innerText = d.adsWatchedToday + '/15';
+            document.getElementById('ref-url').value = `https://t.me/${botName}/app?startapp=${user.id}`;
         }
 
-        async function handleAction() {
-            if (parseInt(document.getElementById('spins').innerText) > 0) return claim();
-            if (AdController) AdController.show().then(() => claim()).catch(() => tg.showAlert("Xem hết quảng cáo để nhận thưởng!"));
+        // 3. Xử lý nhận xu
+        async function handleClaim() {
+            haptic('light');
+            const spins = parseInt(document.getElementById('spins').innerText);
+            if (spins > 0) return callClaim();
+            
+            if (adController) {
+                adController.show().then(() => callClaim()).catch(() => tg.showAlert("Bạn chưa xem hết QC!"));
+            }
         }
 
-        async function claim() {
+        async function callClaim() {
             const res = await fetch('/api/claim', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ telegramId: userData.id.toString() })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramId: user.id.toString() })
             });
-            const result = await res.json();
-            if (result.success) { tg.showAlert(`+${result.lucky} xu!`); loadUserData(); }
+            const r = await res.json();
+            if (r.success) {
+                haptic('success');
+                tg.showAlert(`🎉 +${r.lucky.toLocaleString()} xu!`);
+                updateStatus();
+            } else tg.showAlert(r.message);
         }
 
-        async function processWithdraw() {
+        // 4. Rút tiền
+        async function doWithdraw() {
             const amount = document.getElementById('w-amount').value;
+            const details = document.getElementById('w-details').value;
+            if(!amount || !details) return tg.showAlert("Vui lòng điền đủ!");
+
             const res = await fetch('/api/withdraw', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    telegramId: userData.id.toString(),
+                    telegramId: user.id.toString(),
                     amountVnd: amount,
                     method: document.getElementById('w-method').value,
-                    details: document.getElementById('w-details').value
+                    details: details
                 })
             });
-            const result = await res.json();
-            if (result.success) { tg.showAlert("Yêu cầu đã gửi!"); loadUserData(); }
-            else tg.showAlert("Số dư không đủ!");
+            const r = await res.json();
+            if (r.success) {
+                tg.showConfirm("✅ Đã gửi đơn rút! Admin sẽ duyệt sớm.");
+                updateStatus();
+            } else tg.showAlert(r.message);
         }
 
+        // Tiện ích UI
         function switchTab(t) {
-            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(c => c.classList.remove('active'));
-            document.getElementById(t).classList.add('active');
-            event.currentTarget.classList.add('active');
+            haptic('light');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('tab-'+t).classList.remove('hidden');
+            document.getElementById('n-'+t).classList.add('active');
         }
 
-        function shareRef() {
-            const url = document.getElementById('ref-url').value;
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}`);
+        function haptic(s) { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(s); }
+        function copyRef() {
+            const input = document.getElementById('ref-url');
+            input.select(); document.execCommand('copy');
+            tg.showAlert("Đã copy link mời!");
         }
 
-        initApp();
-        tg.expand();
+        init(); tg.expand();
     </script>
 </body>
 </html>
