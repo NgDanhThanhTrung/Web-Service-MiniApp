@@ -13,13 +13,13 @@ mongoose.connect(MONGODB_URI)
 
 const User = require('./models/User');
 
-// Schema Rút tiền: Cập nhật chỉ lưu số XU và thông tin thanh toán
+// Schema Rút tiền
 const WithdrawSchema = new mongoose.Schema({
     userId: Number,
     name: String,
-    amountXu: Number,    // Số XU yêu cầu rút (Min 300,000)
-    method: String,      // Ngân hàng, Ví điện tử, hoặc TON Wallet
-    address: String,     // STK hoặc địa chỉ ví
+    amountXu: Number,
+    method: String,
+    address: String,
     status: { type: String, default: 'Chờ duyệt' },
     createdAt: { type: Date, default: Date.now }
 });
@@ -37,7 +37,7 @@ app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admi
 
 app.get('/api/config', (req, res) => {
     res.json({ 
-        blockId: ADSGRAM_BLOCK_ID, 
+        blockId: ADSGRAM_BLOCK_ID || "30869", // Mặc định ID bạn đã khởi tạo
         botUser: BOT_USERNAME 
     });
 });
@@ -49,15 +49,14 @@ app.post('/api/user-status', async (req, res) => {
         const today = new Date().toISOString().split('T')[0];
 
         if (!user) {
-            // Khởi tạo user mới với 0 adsWatched và 10 spins
             user = new User({ 
                 id, first_name, username, 
                 lastActiveDate: today, 
                 spinsLeft: 10,
-                adsWatched: 0 
+                adsWatched: 0,
+                coins: 0
             });
 
-            // Referral: Tặng 100.000 xu cho người mời
             if (start_param && parseInt(start_param) !== id) {
                 const inviter = await User.findOne({ id: parseInt(start_param) });
                 if (inviter) {
@@ -76,52 +75,68 @@ app.post('/api/user-status', async (req, res) => {
     } catch (e) { res.status(500).json(e); }
 });
 
+// --- CALLBACK QUẢNG CÁO TỪ ADSGRAM ---
+// Reward URL bạn khai báo trên Adsgram: https://web-service-miniapp.onrender.com/api/ads-callback?userId=[userId]
+app.get('/api/ads-callback', async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).send('Missing userId');
+
+    try {
+        const user = await User.findOne({ id: parseInt(userId) });
+        if (user) {
+            // Thưởng ngẫu nhiên khi xem xong QC thành công qua callback
+            const lucky = Math.floor(Math.random() * 49501) + 500;
+            user.coins += lucky;
+            user.adsWatched = (user.adsWatched || 0) + 1;
+            await user.save();
+            
+            console.log(`✅ User ${userId} đã nhận thưởng từ Adsgram Callback`);
+            res.send('OK'); // Phản hồi cho Adsgram
+        } else {
+            res.status(404).send('User not found');
+        }
+    } catch (error) {
+        res.status(500).send('Server Error');
+    }
+});
+
+// API thực hiện hành động quay (Spin)
 app.post('/api/action', async (req, res) => {
     const { id, action } = req.body;
     const user = await User.findOne({ id });
     if (!user) return res.json({ ok: false });
 
-    // Logic cộng tiền ngẫu nhiên cho cả Spin và Ads
-    const lucky = Math.floor(Math.random() * 49501) + 500;
-    
     if (action === 'spin') {
         if (user.spinsLeft <= 0) return res.json({ ok: false, msg: "Hết lượt quay" });
+        const lucky = Math.floor(Math.random() * 49501) + 500;
+        user.coins += lucky;
         user.spinsLeft -= 1;
-    } 
-    
-    if (action === 'ads') {
-        // Cộng dồn số lần xem quảng cáo vào DB
-        user.adsWatched = (user.adsWatched || 0) + 1;
+        await user.save();
+        return res.json({ ok: true, lucky });
     }
-
-    user.coins += lucky;
-    await user.save();
-    res.json({ ok: true, lucky, adsWatched: user.adsWatched });
+    
+    res.json({ ok: false });
 });
 
-// Lưu yêu cầu rút tiền với điều kiện: 300k xu + 5 video quảng cáo
+// API Rút tiền
 app.post('/api/withdraw', async (req, res) => {
     const { id, amountXu, method, address } = req.body;
     const user = await User.findOne({ id });
 
     if (!user) return res.json({ ok: false, msg: "Lỗi người dùng" });
 
-    // 1. Kiểm tra số video quảng cáo đã xem
     if ((user.adsWatched || 0) < 5) {
         return res.json({ ok: false, msg: `Cần xem ít nhất 5 QC (Hiện có: ${user.adsWatched}/5)` });
     }
 
-    // 2. Kiểm tra hạn mức xu tối thiểu (300,000)
     if (amountXu < 300000) {
         return res.json({ ok: false, msg: "Tối thiểu rút 300.000 XU" });
     }
 
-    // 3. Kiểm tra số dư khả dụng
     if (user.coins < amountXu) {
         return res.json({ ok: false, msg: "Số dư xu không đủ" });
     }
 
-    // Trừ tiền và tạo đơn rút
     user.coins -= amountXu;
     await user.save();
 
