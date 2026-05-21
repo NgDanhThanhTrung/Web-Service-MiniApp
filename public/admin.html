@@ -2,49 +2,74 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
+    <title>Quản Trị Hệ Thống - Tài Khoản B</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-        .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #007aff; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .coin { font-weight: bold; color: #f39c12; }
+        body { font-family: -apple-system, sans-serif; background: #f4f7f6; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #1d4ed8; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; flex: 1; }
+        button { padding: 10px 20px; background: #1d4ed8; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #eee; padding: 12px; text-align: left; font-size: 14px; }
+        th { background: #f8fafc; color: #64748b; }
+        tr:hover { background: #f1f5f9; }
+        .coin { font-weight: bold; color: #fbbf24; }
+        .username { color: #3b82f6; font-family: monospace; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Danh sách người dùng</h2>
-        <input type="password" id="pass" placeholder="Nhập mã Admin">
-        <button onclick="loadUsers()">Tải dữ liệu</button>
+        <h2>👥 Danh sách Thành viên</h2>
+        <div class="controls">
+            <input type="password" id="pass" placeholder="Nhập mật khẩu Admin (ADMIN_PASS)">
+            <button onclick="loadUsers()">TẢI DỮ LIỆU</button>
+        </div>
         <table>
             <thead>
                 <tr>
                     <th>Telegram ID</th>
-                    <th>Tên / Username</th>
+                    <th>Tên hiển thị</th>
+                    <th>Username</th>
                     <th>Số dư (🪙)</th>
-                    <th>Ref</th>
+                    <th>Bạn bè (Ref)</th>
                 </tr>
             </thead>
-            <tbody id="userList"></tbody>
+            <tbody id="userList">
+                <tr><td colspan="5" style="text-align:center; opacity:0.5;">Chưa có dữ liệu...</td></tr>
+            </tbody>
         </table>
     </div>
+
     <script>
         async function loadUsers() {
             const pass = document.getElementById('pass').value;
-            const res = await fetch(`/api/admin/users?pass=${pass}`);
-            if (res.status === 403) return alert("Sai mật khẩu!");
-            const data = await res.json();
-            const list = document.getElementById('userList');
-            list.innerHTML = data.map(u => `
-                <tr>
-                    <td><code>${u.telegramId}</code></td>
-                    <td>${u.name} (@${u.username})</td>
-                    <td class="coin">${u.totalCoins.toLocaleString()}</td>
-                    <td>${u.refs}</td>
-                </tr>
-            `).join('');
+            if(!pass) return alert("Vui lòng nhập mật khẩu!");
+            
+            try {
+                const res = await fetch(`/api/admin/users?pass=${pass}`);
+                if (res.status === 403) return alert("❌ Sai mật khẩu Admin!");
+                
+                const data = await res.json();
+                const list = document.getElementById('userList');
+                
+                if(data.length === 0) {
+                    list.innerHTML = '<tr><td colspan="5" style="text-align:center;">Chưa có người dùng nào.</td></tr>';
+                    return;
+                }
+
+                list.innerHTML = data.map(u => `
+                    <tr>
+                        <td><code>${u.telegramId}</code></td>
+                        <td><b>${u.name || 'Người dùng'}</b></td>
+                        <td class="username">${u.username !== 'n/a' ? '@' + u.username : '---'}</td>
+                        <td class="coin">${u.totalCoins.toLocaleString()}</td>
+                        <td>${u.refs || 0}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                alert("Lỗi kết nối Server hoặc Database!");
+            }
         }
     </script>
 </body>
