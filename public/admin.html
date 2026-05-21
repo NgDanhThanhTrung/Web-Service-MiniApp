@@ -2,62 +2,138 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Tài Khoản B</title>
     <style>
-        body { font-family: sans-serif; background: #0b0e11; color: white; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; background: #1e2329; }
+        :root { --bg: #0b0e11; --card: #1e2329; --gold: #f1b90c; --green: #2ebd85; --text: #eaecef; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
+        h1, h2 { color: var(--gold); border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
+        .header-tools { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }
+        input[type="password"] { padding: 10px; border-radius: 5px; border: 1px solid #444; background: #2b3139; color: white; width: 200px; }
+        button { padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-load { background: var(--gold); color: black; }
+        .btn-load:hover { opacity: 0.8; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 40px; background: var(--card); font-size: 14px; }
         th, td { padding: 12px; border: 1px solid #333; text-align: left; }
-        th { background: #2b3139; color: #f1b90c; }
-        .btn { padding: 5px 10px; cursor: pointer; border: none; border-radius: 4px; }
-        .btn-done { background: #2ebd85; color: white; }
+        th { background: #2b3139; color: var(--gold); text-transform: uppercase; font-size: 12px; }
+        tr:hover { background: rgba(255,255,255,0.02); }
+
+        .btn-done { background: var(--green); color: white; font-size: 12px; }
+        .status-ok { color: var(--green); font-weight: bold; }
+        .unit-ton { color: #0088cc; font-weight: bold; }
+        .unit-vnd { color: #f0b90b; font-weight: bold; }
+        .info-cell { max-width: 300px; word-wrap: break-word; font-size: 13px; color: #848e9c; }
+        
+        @media (max-width: 768px) {
+            table { display: block; overflow-x: auto; }
+        }
     </style>
 </head>
 <body>
-    <h1>ADMIN PANEL (Data Trực Tiếp)</h1>
-    <input type="password" id="pass" placeholder="Nhập pass admin">
-    <button onclick="loadData()">TẢI DỮ LIỆU</button>
+    <h1>ADMIN CONTROL CENTER</h1>
+    
+    <div class="header-tools">
+        <input type="password" id="pass" placeholder="Mật khẩu Admin">
+        <button class="btn-load" onclick="loadData()">🔄 TẢI DỮ LIỆU THỜI GIAN THỰC</button>
+    </div>
 
-    <h2>💰 Yêu Cầu Rút Tiền</h2>
-    <table id="withdrawTable"></table>
+    <h2>💰 DANH SÁCH RÚT TIỀN (CHỜ DUYỆT)</h2>
+    <table id="withdrawTable">
+        <tr><td colspan="6" style="text-align:center;">Vui lòng nhập pass và ấn tải dữ liệu</td></tr>
+    </table>
 
-    <h2>👥 Top 100 Người Dùng</h2>
+    <h2>👥 TOP 100 NGƯỜI DÙNG NHIỀU XU NHẤT</h2>
     <table id="userTable"></table>
 
     <script>
         async function loadData() {
             const pass = document.getElementById('pass').value;
-            const res = await fetch(`/api/admin/all-data?pass=${pass}`);
-            const data = await res.json();
+            if(!pass) return alert("Vui lòng nhập mật khẩu!");
 
-            // Render bảng rút tiền
-            let wHtml = '<tr><th>Tên</th><th>Số tiền</th><th>Cổng</th><th>Thông tin</th><th>Trạng thái</th></tr>';
-            data.withdraws.forEach(w => {
-                wHtml += `<tr>
-                    <td>${w.name}</td>
-                    <td>${w.amountVnd.toLocaleString()}đ</td>
-                    <td>${w.method}</td>
-                    <td>${w.address}</td>
-                    <td>${w.status === 'Chờ duyệt' ? `<button class="btn btn-done" onclick="approve('${w._id}')">Duyệt</button>` : w.status}</td>
+            try {
+                const res = await fetch(`/api/admin/all-data?pass=${pass}`);
+                if(!res.ok) throw new Error("Mật khẩu sai hoặc có lỗi!");
+                const data = await res.json();
+
+                // 1. Render bảng rút tiền
+                let wHtml = `<tr>
+                    <th>Ngày yêu cầu</th>
+                    <th>Tên</th>
+                    <th>Yêu cầu rút</th>
+                    <th>Chi phí (Xu)</th>
+                    <th>Cổng thanh toán</th>
+                    <th>Thông tin chi tiết</th>
+                    <th>Hành động</th>
                 </tr>`;
-            });
-            document.getElementById('withdrawTable').innerHTML = wHtml;
 
-            // Render bảng người dùng
-            let uHtml = '<tr><th>Tên</th><th>Số Xu</th><th>Số Ref</th></tr>';
-            data.users.forEach(u => {
-                uHtml += `<tr><td>${u.first_name}</td><td>${u.coins.toLocaleString()}</td><td>${u.refs}</td></tr>`;
-            });
-            document.getElementById('userTable').innerHTML = uHtml;
+                data.withdraws.forEach(w => {
+                    const date = new Date(w.createdAt).toLocaleString('vi-VN');
+                    const unitClass = w.unit === 'TON' ? 'unit-ton' : 'unit-vnd';
+                    const isPending = w.status === 'Chờ duyệt';
+
+                    wHtml += `<tr>
+                        <td>${date}</td>
+                        <td><b>${w.name}</b></td>
+                        <td class="${unitClass}">${w.amountReq.toLocaleString()} ${w.unit}</td>
+                        <td>${w.coinCost.toLocaleString()}</td>
+                        <td>${w.method}</td>
+                        <td class="info-cell">${w.address}</td>
+                        <td>
+                            ${isPending ? 
+                                `<button class="btn-done" onclick="approve('${w._id}')">DUYỆT XONG</button>` : 
+                                `<span class="status-ok">✅ HOÀN TẤT</span>`
+                            }
+                        </td>
+                    </tr>`;
+                });
+                document.getElementById('withdrawTable').innerHTML = wHtml;
+
+                // 2. Render bảng người dùng
+                let uHtml = `<tr>
+                    <th>Top</th>
+                    <th>Tên người dùng</th>
+                    <th>Số dư (Xu)</th>
+                    <th>Số Ref</th>
+                    <th>ID Telegram</th>
+                </tr>`;
+
+                data.users.forEach((u, index) => {
+                    uHtml += `<tr>
+                        <td>${index + 1}</td>
+                        <td>${u.first_name}</td>
+                        <td style="color:var(--gold); font-weight:bold;">${u.coins.toLocaleString()}</td>
+                        <td>${u.refs || 0}</td>
+                        <td style="color:#666;">${u.id}</td>
+                    </tr>`;
+                });
+                document.getElementById('userTable').innerHTML = uHtml;
+
+            } catch (err) {
+                alert(err.message);
+            }
         }
 
         async function approve(id) {
+            if(!confirm("Xác nhận đã chuyển tiền cho người dùng này?")) return;
+            
             const pass = document.getElementById('pass').value;
-            await fetch('/api/admin/approve-withdraw', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id, pass })
-            });
-            loadData();
+            try {
+                const res = await fetch('/api/admin/approve-withdraw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id, pass })
+                });
+                
+                if(res.ok) {
+                    loadData(); // Tải lại bảng sau khi duyệt
+                } else {
+                    alert("Lỗi khi duyệt đơn!");
+                }
+            } catch (err) {
+                alert("Không thể kết nối máy chủ!");
+            }
         }
     </script>
 </body>
