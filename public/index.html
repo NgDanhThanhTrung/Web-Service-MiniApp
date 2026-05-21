@@ -15,12 +15,30 @@
         
         .balance-card { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         
-        .tabs { display: flex; gap: 8px; margin: 20px 0; background: var(--card); padding: 5px; border-radius: 30px; }
-        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 25px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 13px; }
+        /* CẬP NHẬT: Tabs Menu cố định dưới cùng */
+        .tabs { 
+            display: flex; 
+            gap: 8px; 
+            background: var(--card); 
+            padding: 10px 15px; 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            z-index: 1000;
+            border-top: 1px solid #333;
+            /* Thêm khoảng trống cho vạch điều hướng của iPhone đời mới */
+            padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px));
+        }
+        
+        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 20px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 13px; }
         .tab-btn.active { background: #2b3139; color: var(--gold); font-weight: bold; }
 
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+
+        /* CẬP NHẬT: Tạo khoảng trống để nội dung không bị Tabs che mất */
+        .main { padding-bottom: 100px; }
 
         .action-group { display: flex; flex-direction: column; gap: 15px; margin-top: 40px; }
         .btn-soft { padding: 18px; border-radius: 30px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; outline: none; }
@@ -50,12 +68,6 @@
                 <p id="b-vnd" style="margin: 0; color: var(--gold); font-size: 16px; font-weight: 500;">≈ 0 VNĐ</p>
             </div>
         </header>
-
-        <div class="tabs">
-            <button class="tab-btn active" onclick="openTab(event, 'play')">🎡 KIẾM XU</button>
-            <button class="tab-btn" onclick="event, openTab(event, 'ref')">👥 MỜI BẠN</button>
-            <button class="tab-btn" onclick="openTab(event, 'bank')">🏦 RÚT TIỀN</button>
-        </div>
 
         <main class="main">
             <div id="play" class="tab-content active">
@@ -99,6 +111,12 @@
                 </div>
             </div>
         </main>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="openTab(event, 'play')">🎡 KIẾM XU</button>
+            <button class="tab-btn" onclick="openTab(event, 'ref')">👥 MỜI BẠN</button>
+            <button class="tab-btn" onclick="openTab(event, 'bank')">🏦 RÚT TIỀN</button>
+        </div>
     </div>
 
     <script>
@@ -168,7 +186,6 @@
             if (!adController) return tg.showAlert("Quảng cáo đang tải, vui lòng đợi...");
             
             adController.show().then(() => {
-                // Sau khi xem xong, đợi 2.5s để server xử lý callback rồi mới update UI
                 tg.showAlert("✅ Cảm ơn bạn! Phần thưởng đang được xử lý...");
                 setTimeout(updateUI, 2500);
             }).catch((err) => {
