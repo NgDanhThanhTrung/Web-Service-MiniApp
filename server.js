@@ -10,12 +10,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Kết nối MongoDB Atlas
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('🚀 [Database] Kết nối thành công'))
-    .catch(err => console.error('❌ [Database] Lỗi kết nối:', err));
+// 1. Kết nối MongoDB Atlas (Đã thêm tùy chọn timeout để tránh treo server)
+mongoose.connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000
+})
+.then(() => console.log('🚀 [Database] Kết nối thành công'))
+.catch(err => console.error('❌ [Database] Lỗi kết nối:', err.message));
 
-// API Cấu hình lấy ID từ môi trường Render
+// 2. Lấy cấu hình từ biến môi trường Render
 app.get('/api/config', (req, res) => {
     res.json({
         adsgramId: process.env.ADSGRAM_BLOCK_ID,
@@ -23,33 +25,34 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-// Logic: Nhận diện người dùng & Cập nhật Username thời gian thực
+// 3. API Status: Nhận diện và Cập nhật Username/Tên
 app.post('/api/status', async (req, res) => {
     const { telegramId, username, name, refId } = req.body;
     const today = new Date().toDateString();
     
     try {
-        // Luôn cập nhật Username và Tên mới nhất từ Telegram vào DB
+        // Tìm và cập nhật thông tin mới nhất (Upsert: false vì ta sẽ tạo mới nếu không thấy)
         let user = await User.findOneAndUpdate(
             { telegramId },
             { $set: { username: username || 'n/a', name: name || 'Người dùng' } },
-            { new: true, upsert: false }
+            { new: true }
         );
 
         if (!user) {
-            // Tạo tài khoản mới nếu chưa tồn tại
+            // Logic cho người dùng mới
             user = new User({ telegramId, username, name });
-            // Xử lý Referral (Thưởng 10.000 xu cho người mời)
             if (refId && refId !== telegramId) {
-                await User.findOneAndUpdate(
-                    { telegramId: refId },
-                    { $inc: { totalCoins: 10000, refs: 1 } }
-                );
-                user.spinsLeft += 2; // Người mới được tặng 2 lượt quay
+                const boss = await User.findOne({ telegramId: refId });
+                if (boss) {
+                    boss.totalCoins += 10000;
+                    boss.refs += 1;
+                    await boss.save();
+                    user.spinsLeft += 2; // Thưởng người mới 2 lượt
+                }
             }
             await user.save();
         } else {
-            // Reset giới hạn Ads mỗi khi qua ngày mới
+            // Reset Ads hàng ngày
             if (user.lastActiveDay !== today) {
                 user.adsWatchedToday = 0;
                 user.lastActiveDay = today;
@@ -57,34 +60,35 @@ app.post('/api/status', async (req, res) => {
             }
         }
         res.json(user);
-    } catch (e) { res.status(500).json({ error: "Lỗi Server" }); }
+    } catch (e) { res.status(500).json({ error: "Lỗi hệ thống" }); }
 });
 
-// Logic: Nhận thưởng (Claim)
+// 4. Logic nhận thưởng (Claim)
 app.post('/api/claim', async (req, res) => {
     const { telegramId } = req.body;
     try {
         const user = await User.findOne({ telegramId });
         if (!user) return res.status(404).json({ success: false });
 
-        let updateData = {};
-        if (user.spinsLeft > 0) {
-            updateData = { $inc: { spinsLeft: -1 } };
-        } else if (user.adsWatchedToday < 15) {
-            updateData = { $inc: { adsWatchedToday: 1 } };
-        } else {
+        if (user.spinsLeft <= 0 && user.adsWatchedToday >= 15) {
             return res.json({ success: false, message: "Hết lượt hôm nay!" });
         }
 
-        const lucky = Math.floor(Math.random() * 49501) + 500; // Random 500 - 50,000 xu
-        updateData.$inc.totalCoins = lucky;
+        const lucky = Math.floor(Math.random() * (50000 - 500 + 1)) + 500;
+        
+        if (user.spinsLeft > 0) {
+            user.spinsLeft -= 1;
+        } else {
+            user.adsWatchedToday += 1;
+        }
 
-        const updated = await User.findOneAndUpdate({ telegramId }, updateData, { new: true });
-        res.json({ success: true, lucky, user: updated });
+        user.totalCoins += lucky;
+        await user.save();
+        res.json({ success: true, lucky, user });
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// Logic: Rút tiền & Báo cáo Admin Telegram
+// 5. Logic Rút tiền & Báo cáo Admin
 app.post('/api/withdraw', async (req, res) => {
     const { telegramId, amountVnd, method, details } = req.body;
     try {
@@ -93,16 +97,15 @@ app.post('/api/withdraw', async (req, res) => {
 
         if (!user || user.totalCoins < cost) return res.json({ success: false, message: "Số dư không đủ!" });
 
-        await User.findOneAndUpdate({ telegramId }, { $inc: { totalCoins: -cost } });
+        user.totalCoins -= cost;
+        await user.save();
 
-        // Gửi thông báo về Bot Admin
-        const msg = `💰 *ĐƠN RÚT TIỀN MỚI*\n` +
-                    `━━━━━━━━━━━━━━━\n` +
-                    `👤 *Khách:* ${user.name}\n` +
-                    `🔗 *User:* @${user.username}\n` +
-                    `💵 *Số tiền:* ${Number(amountVnd).toLocaleString()} VNĐ\n` +
-                    `🏦 *Cổng:* ${method.toUpperCase()}\n` +
-                    `📝 *STK:* \`${details}\``;
+        const msg = `💰 *YÊU CẦU RÚT TIỀN*\n` +
+                    `👤 Tên: ${user.name}\n` +
+                    `🔗 User: @${user.username}\n` +
+                    `💵 Số tiền: ${Number(amountVnd).toLocaleString()} VNĐ\n` +
+                    `🏦 Cổng: ${method}\n` +
+                    `📝 STK: \`${details}\``;
 
         fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -114,8 +117,5 @@ app.post('/api/withdraw', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// Các tuyến đường file
-app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
-app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
-
-app.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
