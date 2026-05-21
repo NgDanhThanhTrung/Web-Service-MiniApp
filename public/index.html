@@ -28,48 +28,32 @@
         <main class="main">
             <div id="play" class="tab-content active">
                 <div class="stats-row">
-                    <div class="stat">Lượt Free: <b id="s-free">0</b></div>
-                    <div class="stat">Ads: <b id="s-ads">0/15</b></div>
+                    <div class="stat">Lượt Quay: <b id="s-free">0</b></div>
+                    <div class="stat">Ads Hôm Nay: <b id="s-ads">0/15</b></div>
                 </div>
-                <button class="btn-main" onclick="claim(false)">🎁 NHẬN XU FREE</button>
-                <button class="btn-ads" onclick="showAds()">📺 XEM QC (RANDOM 500-50K)</button>
-                
-                <div class="info-box" style="margin-top: 20px; font-size: 0.8rem; color: #888; text-align: center;">
-                    <p><i class="fas fa-info-circle"></i> Mỗi ngày bạn nhận được 10 lượt quay miễn phí.</p>
-                </div>
+                <button class="btn-main" onclick="claim(false)">🎁 QUAY NHẬN XU FREE</button>
+                <button class="btn-ads" onclick="showAds()">📺 XEM QC (NHẬN 500-50K XU)</button>
             </div>
 
             <div id="ref" class="tab-content">
                 <div class="ref-box">
                     <h3>👥 Mời Bạn Nhận 10.000 Xu</h3>
-                    <p>Gửi link cho bạn bè, bạn nhận <b>10k xu</b>, bạn bè nhận <b>2 lượt free</b> ngay khi vào app.</p>
-                    <div class="input-group">
-                        <input type="text" id="ref-link" readonly>
-                        <button class="btn-copy" onclick="copyLink()">SAO CHÉP LINK</button>
-                    </div>
+                    <p style="color: var(--gray); font-size: 14px;">Bạn nhận 10k xu, bạn bè nhận 5 lượt quay miễn phí ngay khi bắt đầu.</p>
+                    <input type="text" id="ref-link" readonly>
+                    <button class="btn-copy" onclick="copyLink()">SAO CHÉP LINK MỜI</button>
                 </div>
             </div>
 
             <div id="bank" class="tab-content">
                 <div class="withdraw-form">
-                    <div class="input-item">
-                        <label>Số tiền rút (VNĐ)</label>
-                        <input type="number" id="w-amount" placeholder="VD: 20000">
-                    </div>
-                    <div class="input-item">
-                        <label>Phương thức thanh toán</label>
-                        <select id="w-method">
-                            <option value="MoMo">Ví MoMo</option>
-                            <option value="Ngân hàng">Chuyển khoản (ATM)</option>
-                            <option value="Thẻ cào">Thẻ cào (Viettel/Mobi)</option>
-                        </select>
-                    </div>
-                    <div class="input-item">
-                        <label>Thông tin nhận tiền</label>
-                        <input type="text" id="w-info" placeholder="SĐT MoMo / STK / Nhà mạng">
-                    </div>
-                    <button class="btn-confirm" onclick="requestWithdraw()">GỬI YÊU CẦU</button>
-                    <p style="font-size: 0.7rem; color: #777; margin-top: 10px;">* Đơn rút tiền sẽ được Admin duyệt trong vòng 24h.</p>
+                    <input type="number" id="w-amount" placeholder="Số tiền VNĐ (VD: 20000)">
+                    <select id="w-method">
+                        <option value="MoMo">Ví MoMo</option>
+                        <option value="Ngân hàng">Ngân hàng (ATM)</option>
+                        <option value="Thẻ cào">Thẻ cào điện thoại</option>
+                    </select>
+                    <input type="text" id="w-info" placeholder="SĐT MoMo / STK / Nhà mạng">
+                    <button class="btn-confirm" onclick="requestWithdraw()">GỬI YÊU CẦU RÚT TIỀN</button>
                 </div>
             </div>
         </main>
@@ -83,164 +67,85 @@
 
         async function init() {
             tg.expand();
-            tg.ready();
-            
             try {
-                // Lấy cấu hình từ Server (Block ID Adsgram và Username Bot)
-                const cfgRes = await fetch('/api/config');
-                const cfg = await cfgRes.json();
-                botUsername = cfg.botUsername || cfg.botUser; // Linh hoạt theo key của Backend
-
-                // Khởi tạo Adsgram
+                const cfg = await (await fetch('/api/config')).json();
+                botUsername = cfg.botUser;
                 if (window.Adsgram) {
                     adController = window.Adsgram.init({ 
-                        blockId: cfg.adsgramId || cfg.blockId,
+                        blockId: cfg.blockId,
                         params: { userId: user.id.toString() } 
                     });
                 }
-            } catch (err) {
-                console.error("Lỗi khởi tạo:", err);
-            }
-            
+            } catch (e) {}
             updateUI();
         }
 
         async function updateUI() {
-            try {
-                // Đồng bộ trạng thái người dùng (Đổi route /api/status cho khớp Backend Monolith)
-                const res = await fetch('/api/user-status', { 
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        id: user.id, 
-                        username: user.username, 
-                        first_name: user.first_name,
-                        start_param: tg.initDataUnsafe.start_param
-                    })
-                });
-                
-                const d = await res.json();
-                
-                // Cập nhật các con số trên giao diện
-                document.getElementById('b-coins').innerText = d.coins.toLocaleString();
-                document.getElementById('b-vnd').innerText = `≈ ${(d.coins/1000).toLocaleString()} VNĐ`;
-                document.getElementById('s-free').innerText = d.spinsLeft;
-                
-                // Hiển thị tiến trình xem Ads (nếu Backend có hỗ trợ field này)
-                if(d.dailyAdsCount !== undefined) {
-                    document.getElementById('s-ads').innerText = d.dailyAdsCount + '/15';
-                }
-
-                // Cập nhật Link giới thiệu
-                document.getElementById('ref-link').value = `https://t.me/${botUsername}/app?startapp=${user.id}`;
-            } catch (err) {
-                console.error("Lỗi cập nhật UI:", err);
-            }
+            const res = await fetch('/api/user-status', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    id: user.id, username: user.username, first_name: user.first_name,
+                    start_param: tg.initDataUnsafe.start_param
+                })
+            });
+            const d = await res.json();
+            document.getElementById('b-coins').innerText = d.coins.toLocaleString();
+            document.getElementById('b-vnd').innerText = `≈ ${(d.coins/1000).toLocaleString()} VNĐ`;
+            document.getElementById('s-free').innerText = d.spinsLeft;
+            document.getElementById('ref-link').value = `https://t.me/${botUsername}/app?startapp=${user.id}`;
         }
 
         async function claim(isAds) {
             tg.HapticFeedback.impactOccurred('medium');
-            
-            try {
-                // Gửi yêu cầu nhận thưởng về Backend
-                const res = await fetch('/api/action', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        id: user.id, 
-                        action: isAds ? 'ads' : 'spin' 
-                    })
-                });
-                
-                const r = await res.json();
-                
-                if (r.ok) {
-                    tg.showAlert(`🎉 Chúc mừng! Bạn nhận được ${r.lucky.toLocaleString()} xu!`);
-                    updateUI();
-                } else {
-                    tg.showAlert(r.msg || "Hết lượt hoặc có lỗi xảy ra!");
-                }
-            } catch (err) {
-                tg.showAlert("Không thể kết nối máy chủ!");
-            }
+            const res = await fetch('/api/action', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: user.id, action: isAds ? 'ads' : 'spin' })
+            });
+            const r = await res.json();
+            if (r.ok) {
+                tg.showAlert(`🎉 Chúc mừng! Bạn nhận được ${r.lucky.toLocaleString()} xu!`);
+                updateUI();
+            } else tg.showAlert(r.msg || "Lỗi xảy ra!");
         }
 
         function showAds() {
-            if (!adController) return tg.showAlert("QC chưa sẵn sàng");
-            
-            adController.show()
-                .then(() => claim(true)) // Xem xong thì cộng xu
-                .catch((err) => {
-                    console.log("Ads Error:", err);
-                    tg.showAlert("Bạn cần xem hết quảng cáo để nhận thưởng!");
-                });
+            if (!adController) return tg.showAlert("QC chưa tải xong");
+            adController.show().then(() => claim(true)).catch(() => tg.showAlert("Hãy xem hết QC!"));
         }
 
         async function requestWithdraw() {
             const amount = document.getElementById('w-amount').value;
-            const method = document.getElementById('w-method').value;
             const info = document.getElementById('w-info').value;
+            if(!amount || !info) return tg.showAlert("Điền đủ thông tin!");
             
-            if(!amount || amount < 1000) return tg.showAlert("Số tiền rút tối thiểu là 1,000đ");
-            if(!info) return tg.showAlert("Vui lòng điền thông tin thanh toán!");
-
-            try {
-                const res = await fetch('/api/withdraw', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        id: user.id, 
-                        amountVnd: parseInt(amount), 
-                        method: method, 
-                        address: info 
-                    })
-                });
-                
-                const r = await res.json();
-                
-                if(r.ok) {
-                    tg.showAlert("✅ Gửi yêu cầu rút thành công! Admin sẽ duyệt sớm.");
-                    document.getElementById('w-amount').value = "";
-                    document.getElementById('w-info').value = "";
-                    updateUI();
-                } else {
-                    tg.showAlert(r.msg || "Lỗi khi rút tiền!");
-                }
-            } catch (err) {
-                tg.showAlert("Lỗi kết nối!");
-            }
+            const res = await fetch('/api/withdraw', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    id: user.id, amountVnd: parseInt(amount), 
+                    method: document.getElementById('w-method').value, address: info 
+                })
+            });
+            const r = await res.json();
+            if(r.ok) { tg.showAlert("✅ Đã gửi đơn rút!"); updateUI(); }
+            else tg.showAlert(r.msg);
         }
 
-        function openTab(evt, tabId) {
-            const tabContents = document.getElementsByClassName("tab-content");
-            for (let i = 0; i < tabContents.length; i++) {
-                tabContents[i].classList.remove("active");
-            }
-
-            const tabBtns = document.getElementsByClassName("tab-btn");
-            for (let i = 0; i < tabBtns.length; i++) {
-                tabBtns[i].classList.remove("active");
-            }
-
-            document.getElementById(tabId).classList.add("active");
-            evt.currentTarget.classList.add("active");
+        function openTab(evt, name) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(name).classList.add('active');
+            evt.currentTarget.classList.add('active');
             tg.HapticFeedback.selectionChanged();
         }
 
         function copyLink() {
-            const input = document.getElementById('ref-link');
-            input.select();
-            input.setSelectionRange(0, 99999); // Cho mobile
-            
-            try {
-                navigator.clipboard.writeText(input.value);
-                tg.showAlert("Đã copy link giới thiệu!");
-            } catch (err) {
-                // Fallback nếu navigator.clipboard không chạy
-                input.select();
-                document.execCommand('copy');
-                tg.showAlert("Đã copy link mời!");
-            }
+            const el = document.getElementById('ref-link');
+            el.select();
+            document.execCommand('copy');
+            tg.showAlert("Đã copy link mời!");
         }
 
         init();
