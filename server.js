@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const fetch = require('node-fetch');
 const User = require('./models/User');
 
 const app = express();
@@ -10,12 +9,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Kết nối MongoDB với cơ chế Timeout để tránh treo Render
-mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-    .then(() => console.log('🚀 [DB] Connected'))
-    .catch(err => console.error('❌ [DB] Error:', err.message));
+// Kết nối Database (Bắt buộc phải có biến MONGODB_URI trên Render)
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('✅ MongoDB Connected'))
+    .catch(err => console.error('❌ DB Error:', err));
 
-// API lấy cấu hình cho Frontend
+// Định tuyến cho trang Admin (Địa chỉ: /account)
+app.get('/account', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/admin.html'));
+});
+
+// Lấy cấu hình từ Render Environment
 app.get('/api/config', (req, res) => {
     res.json({
         adsgramId: process.env.ADSGRAM_BLOCK_ID,
@@ -23,27 +27,20 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-// Nhận diện người dùng & Cập nhật Username/Tên thời gian thực
+// API: Đồng bộ User từ Telegram
 app.post('/api/status', async (req, res) => {
-    const { telegramId, username, name, refId } = req.body;
-    const today = new Date().toDateString();
+    const { telegramId, username, name } = req.body;
     try {
         let user = await User.findOneAndUpdate(
             { telegramId },
             { $set: { username: username || 'n/a', name: name || 'User' } },
             { new: true, upsert: true }
         );
-
-        if (user.lastActiveDay !== today) {
-            user.adsWatchedToday = 0;
-            user.lastActiveDay = today;
-            await user.save();
-        }
         res.json(user);
     } catch (e) { res.status(500).json({ error: "Server Error" }); }
 });
 
-// Logic nhận xu ngẫu nhiên 500 - 50.000
+// API: Nhận xu ngẫu nhiên (500 - 50,000)
 app.post('/api/claim', async (req, res) => {
     const { telegramId, isAds } = req.body;
     try {
@@ -51,13 +48,13 @@ app.post('/api/claim', async (req, res) => {
         if (!user) return res.status(404).json({ success: false });
 
         if (!isAds && user.spinsLeft <= 0) {
-            return res.json({ success: false, message: "Hết lượt quay miễn phí!" });
+            return res.json({ success: false, message: "Hết lượt free, hãy xem quảng cáo!" });
         }
 
         const lucky = Math.floor(Math.random() * (50000 - 500 + 1)) + 500;
         
-        if (isAds) { user.adsWatchedToday += 1; } 
-        else { user.spinsLeft -= 1; }
+        if (isAds) user.adsWatchedToday += 1;
+        else user.spinsLeft -= 1;
 
         user.totalCoins += lucky;
         await user.save();
@@ -65,13 +62,13 @@ app.post('/api/claim', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// API Quản trị (Dùng cho /account)
+// API: Danh sách người dùng cho Admin
 app.get('/api/admin/users', async (req, res) => {
     const { pass } = req.query;
-    if (pass !== process.env.ADMIN_PASS) return res.status(403).send("Access Denied");
+    if (pass !== process.env.ADMIN_PASS) return res.status(403).send("Forbidden");
     const users = await User.find().sort({ totalCoins: -1 });
     res.json(users);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 App running on port ${PORT}`));
