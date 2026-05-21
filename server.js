@@ -10,12 +10,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Kết nối MongoDB (Nhớ whitelist IP 0.0.0.0/0 trên Atlas)
+// Kết nối MongoDB với cơ chế Timeout để tránh treo Render
 mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-    .then(() => console.log('✅ Kết nối Database thành công'))
-    .catch(err => console.error('❌ Lỗi kết nối DB:', err.message));
+    .then(() => console.log('🚀 [DB] Connected'))
+    .catch(err => console.error('❌ [DB] Error:', err.message));
 
-// 1. API Config: Lấy thông tin môi trường
+// API lấy cấu hình cho Frontend
 app.get('/api/config', (req, res) => {
     res.json({
         adsgramId: process.env.ADSGRAM_BLOCK_ID,
@@ -23,14 +23,14 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-// 2. API Status: Nhận diện người dùng & Cập nhật Username
+// Nhận diện người dùng & Cập nhật Username/Tên thời gian thực
 app.post('/api/status', async (req, res) => {
     const { telegramId, username, name, refId } = req.body;
     const today = new Date().toDateString();
     try {
         let user = await User.findOneAndUpdate(
             { telegramId },
-            { $set: { username: username || 'n/a', name: name || 'Người dùng' } },
+            { $set: { username: username || 'n/a', name: name || 'User' } },
             { new: true, upsert: true }
         );
 
@@ -40,10 +40,10 @@ app.post('/api/status', async (req, res) => {
             await user.save();
         }
         res.json(user);
-    } catch (e) { res.status(500).json({ error: "Lỗi Server" }); }
+    } catch (e) { res.status(500).json({ error: "Server Error" }); }
 });
 
-// 3. API Claim: Nhận xu ngẫu nhiên (500 - 50,000)
+// Logic nhận xu ngẫu nhiên 500 - 50.000
 app.post('/api/claim', async (req, res) => {
     const { telegramId, isAds } = req.body;
     try {
@@ -56,11 +56,8 @@ app.post('/api/claim', async (req, res) => {
 
         const lucky = Math.floor(Math.random() * (50000 - 500 + 1)) + 500;
         
-        if (isAds) {
-            user.adsWatchedToday += 1;
-        } else {
-            user.spinsLeft -= 1;
-        }
+        if (isAds) { user.adsWatchedToday += 1; } 
+        else { user.spinsLeft -= 1; }
 
         user.totalCoins += lucky;
         await user.save();
@@ -68,16 +65,13 @@ app.post('/api/claim', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// 4. API Admin: Lấy danh sách cho trang /account
+// API Quản trị (Dùng cho /account)
 app.get('/api/admin/users', async (req, res) => {
     const { pass } = req.query;
-    if (pass !== process.env.ADMIN_PASS) return res.status(403).json({ error: "Unauthorized" });
+    if (pass !== process.env.ADMIN_PASS) return res.status(403).send("Access Denied");
     const users = await User.find().sort({ totalCoins: -1 });
     res.json(users);
 });
 
-// Điều hướng giao diện
-app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server đang chạy tại cổng ${PORT}`));
+app.listen(PORT, () => console.log(`Listening on ${PORT}`));
