@@ -1,15 +1,18 @@
-:root { --bg: #0b141a; --card: #18222d; --blue: #2481cc; --gold: #f39c12; }
-body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 90px; }
-.top-nav { padding: 20px; display: flex; align-items: center; }
-.user-pill { display: flex; align-items: center; background: var(--card); padding: 8px 15px; border-radius: 50px; gap: 10px; }
-#avatar { width: 35px; height: 35px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-.balance-card { background: linear-gradient(135deg, #1d4b73, #112d45); margin: 20px; padding: 30px; border-radius: 25px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-#balance { font-size: 45px; margin: 10px 0; color: var(--gold); }
-.grid-stats { display: flex; justify-content: space-around; margin: 20px; }
-.stat-item { background: var(--card); padding: 15px; border-radius: 15px; width: 40%; text-align: center; }
-.btn-main, .btn-ads { width: 90%; margin: 10px 5%; padding: 18px; border-radius: 15px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; }
+:root { --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; --gold: #f1b90c; --text: #eaecef; }
+body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 20px; }
+.header { background: linear-gradient(180deg, #1e2329 0%, #0b0e11 100%); padding: 30px 20px; text-align: center; border-bottom: 1px solid #333; }
+.balance-card h1 { font-size: 50px; margin: 10px 0; color: var(--gold); }
+.tabs { display: flex; justify-content: space-around; background: var(--card); padding: 5px; }
+.tab-btn { background: none; border: none; color: #848e9c; padding: 15px; font-weight: bold; font-size: 13px; cursor: pointer; }
+.tab-btn.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
+.main { padding: 20px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.stats-row { display: flex; gap: 15px; margin-bottom: 20px; }
+.stat { flex: 1; background: var(--card); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #333; }
+.btn-main, .btn-ads, .btn-confirm { width: 100%; padding: 20px; border-radius: 15px; border: none; font-weight: 800; font-size: 16px; margin-bottom: 15px; cursor: pointer; }
 .btn-main { background: var(--blue); color: white; }
 .btn-ads { background: transparent; border: 2px solid var(--gold); color: var(--gold); }
-.bottom-bar { position: fixed; bottom: 0; width: 100%; height: 75px; background: #17212b; display: flex; border-top: 1px solid rgba(255,255,255,0.1); }
-.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0.5; font-size: 12px; }
-.nav-btn.active { opacity: 1; color: var(--blue); }
+.btn-confirm { background: #2ebd85; color: white; margin-top: 10px; }
+input, select { width: 100%; padding: 15px; border-radius: 10px; background: #2b3139; border: 1px solid #474d57; color: white; margin-bottom: 15px; box-sizing: border-box; }
+.ref-box { background: var(--card); padding: 20px; border-radius: 15px; text-align: center; }
