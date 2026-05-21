@@ -8,14 +8,14 @@ const { ADMIN_PASS, ADSGRAM_BLOCK_ID, BOT_USERNAME, MONGODB_URI } = process.env;
 
 // Kết nối MongoDB
 mongoose.connect(MONGODB_URI)
-    .then(() => console.log('✅ Hệ thống B-Account (No Bot) đã sẵn sàng'))
+    .then(() => console.log('✅ Hệ thống Web đã đồng bộ với Tài khoản A'))
     .catch(err => console.error('❌ Lỗi kết nối DB:', err));
 
 const User = require('./models/User');
 
-// Schema Rút tiền
+// Schema Rút tiền (Đồng bộ userId là String để khớp với telegramId)
 const WithdrawSchema = new mongoose.Schema({
-    userId: Number,
+    userId: String,
     name: String,
     amountXu: Number,
     method: String,
@@ -43,126 +43,110 @@ app.get('/api/config', (req, res) => {
 });
 
 app.post('/api/user-status', async (req, res) => {
-    const { id, first_name, username, start_param } = req.body;
+    const { id, first_name, username } = req.body;
     try {
-        let user = await User.findOne({ id });
-        const today = new Date().toISOString().split('T')[0];
+        // Tìm bằng telegramId (String) để khớp với Bot và Model gốc
+        let user = await User.findOne({ telegramId: id.toString() });
+        const today = new Date().toDateString();
 
         if (!user) {
-            // CẬP NHẬT: Khởi tạo 5 lượt quay cho người dùng mới
+            // Nếu người dùng vào thẳng web, tự tạo doc mới theo đúng model
             user = new User({ 
-                id, first_name, username, 
-                lastActiveDate: today, 
+                telegramId: id.toString(), 
+                name: first_name, 
+                username: username || 'n/a', 
+                lastActiveDay: today, 
                 spinsLeft: 5, 
-                adsWatched: 0,
-                coins: 0
+                adsWatchedToday: 0,
+                totalCoins: 0
             });
-
-            if (start_param && parseInt(start_param) !== id) {
-                const inviter = await User.findOne({ id: parseInt(start_param) });
-                if (inviter) {
-                    inviter.coins += 100000;
-                    inviter.refs = (inviter.refs || 0) + 1;
-                    await inviter.save();
-                }
-            }
             await user.save();
-        } else if (user.lastActiveDate !== today) {
-            // CẬP NHẬT: Hồi 5 lượt quay mỗi ngày
+        } else if (user.lastActiveDay !== today) {
+            // Reset 5 lượt quay và 0 lượt xem QC mỗi ngày
             user.spinsLeft = 5;
-            user.lastActiveDate = today;
+            user.adsWatchedToday = 0;
+            user.lastActiveDay = today;
             await user.save();
         }
-        res.json(user);
+
+        // Ánh xạ (Map) dữ liệu để Frontend cũ vẫn đọc được (coins, id, adsWatched...)
+        const mappedUser = {
+            ...user._doc,
+            id: user.telegramId,
+            coins: user.totalCoins,
+            first_name: user.name,
+            adsWatched: user.adsWatchedToday
+        };
+        res.json(mappedUser);
     } catch (e) { res.status(500).json(e); }
 });
 
-// --- CALLBACK QUẢNG CÁO TỪ ADSGRAM ---
 app.get('/api/ads-callback', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).send('Missing userId');
 
     try {
-        const user = await User.findOne({ id: parseInt(userId) });
+        const user = await User.findOne({ telegramId: userId.toString() });
         if (user) {
-            // Thưởng ngẫu nhiên từ 500 đến 50.000 xu
             const lucky = Math.floor(Math.random() * 49501) + 500;
-            user.coins += lucky;
-            user.adsWatched = (user.adsWatched || 0) + 1;
+            user.totalCoins += lucky;
+            user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
             await user.save();
-            
-            console.log(`✅ User ${userId} xem QC thành công. Nhận: ${lucky} xu. Tổng QC: ${user.adsWatched}`);
             res.send('OK'); 
         } else {
             res.status(404).send('User not found');
         }
-    } catch (error) {
-        console.error('❌ Ads Callback Error:', error);
-        res.status(500).send('Server Error');
-    }
+    } catch (error) { res.status(500).send('Server Error'); }
 });
 
-// API thực hiện hành động quay (Spin)
 app.post('/api/action', async (req, res) => {
     const { id, action } = req.body;
     try {
-        const user = await User.findOne({ id });
+        const user = await User.findOne({ telegramId: id.toString() });
         if (!user) return res.json({ ok: false, msg: "Người dùng không tồn tại" });
 
         if (action === 'spin') {
-            if (user.spinsLeft <= 0) return res.json({ ok: false, msg: "Bạn đã hết lượt quay hôm nay!" });
+            if (user.spinsLeft <= 0) return res.json({ ok: false, msg: "Hết lượt quay!" });
             
             const lucky = Math.floor(Math.random() * 49501) + 500;
-            user.coins += lucky;
+            user.totalCoins += lucky;
             user.spinsLeft -= 1;
             await user.save();
-            return res.json({ ok: true, lucky });
+            return res.json({ ok: true, lucky, coins: user.totalCoins, spinsLeft: user.spinsLeft });
         }
-        res.json({ ok: false, msg: "Hành động không hợp lệ" });
-    } catch (e) {
-        res.json({ ok: false, msg: "Lỗi hệ thống" });
-    }
+        res.json({ ok: false });
+    } catch (e) { res.json({ ok: false }); }
 });
 
-// API Rút tiền
 app.post('/api/withdraw', async (req, res) => {
     const { id, amountXu, method, address } = req.body;
     try {
-        const user = await User.findOne({ id });
-        if (!user) return res.json({ ok: false, msg: "Lỗi xác thực người dùng" });
+        const user = await User.findOne({ telegramId: id.toString() });
+        if (!user) return res.json({ ok: false, msg: "Lỗi xác thực" });
 
-        // Kiểm tra điều kiện 5 quảng cáo
-        const currentAds = user.adsWatched || 0;
-        if (currentAds < 5) {
-            return res.json({ ok: false, msg: `Bạn cần xem đủ 5 quảng cáo để rút tiền (Hiện tại: ${currentAds}/5)` });
+        if ((user.adsWatchedToday || 0) < 5) {
+            return res.json({ ok: false, msg: `Cần xem đủ 5 QC (Hiện tại: ${user.adsWatchedToday}/5)` });
         }
 
-        // Kiểm tra số dư và mức rút tối thiểu
         if (!amountXu || amountXu < 300000) {
-            return res.json({ ok: false, msg: "Hạn mức rút tối thiểu là 300.000 XU" });
+            return res.json({ ok: false, msg: "Tối thiểu rút 300.000 XU" });
         }
 
-        if (user.coins < amountXu) {
-            return res.json({ ok: false, msg: "Số dư tài khoản không đủ để thực hiện lệnh này" });
+        if (user.totalCoins < amountXu) {
+            return res.json({ ok: false, msg: "Số dư không đủ" });
         }
 
-        // Trừ tiền và tạo lệnh rút
-        user.coins -= amountXu;
+        user.totalCoins -= amountXu;
         await user.save();
 
         const newRequest = new Withdraw({ 
-            userId: id, 
-            name: user.first_name, 
-            amountXu, 
-            method, 
-            address 
+            userId: id.toString(), 
+            name: user.name, 
+            amountXu, method, address 
         });
         await newRequest.save();
-        
         res.json({ ok: true });
-    } catch (e) {
-        res.json({ ok: false, msg: "Lỗi trong quá trình xử lý rút tiền" });
-    }
+    } catch (e) { res.json({ ok: false }); }
 });
 
 // --- ADMIN API ---
@@ -170,10 +154,18 @@ app.post('/api/withdraw', async (req, res) => {
 app.get('/api/admin/all-data', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.sendStatus(403);
     try {
-        const users = await User.find().sort({ coins: -1 }).limit(100);
+        const users = await User.find().sort({ totalCoins: -1 }).limit(100);
         const withdraws = await Withdraw.find().sort({ createdAt: -1 });
-        res.json({ users, withdraws });
-    } catch (e) { res.status(500).send("Admin Data Error"); }
+        
+        // Map lại dữ liệu cho Admin hiển thị
+        const mappedUsers = users.map(u => ({
+            ...u._doc,
+            id: u.telegramId,
+            coins: u.totalCoins,
+            first_name: u.name
+        }));
+        res.json({ users: mappedUsers, withdraws });
+    } catch (e) { res.status(500).send("Error"); }
 });
 
 app.post('/api/admin/approve-withdraw', async (req, res) => {
@@ -181,8 +173,8 @@ app.post('/api/admin/approve-withdraw', async (req, res) => {
     try {
         await Withdraw.findByIdAndUpdate(req.body.id, { status: 'Đã thanh toán' });
         res.json({ ok: true });
-    } catch (e) { res.status(500).send("Approve Error"); }
+    } catch (e) { res.status(500).send("Error"); }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server đang chạy tại cổng ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Web Server đồng bộ đang chạy tại cổng ${PORT}`));
