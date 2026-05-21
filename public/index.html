@@ -9,119 +9,84 @@
     <style>
         :root {
             --tg-bg: var(--tg-theme-bg-color, #0f172a);
-            --tg-secondary: var(--tg-theme-secondary-bg-color, #1e293b);
+            --tg-sec: var(--tg-theme-secondary-bg-color, #1e293b);
             --tg-text: var(--tg-theme-text-color, #ffffff);
-            --accent: #3b82f6;
-            --gold: #fbbf24;
+            --accent: #3b82f6; --gold: #fbbf24;
         }
-
-        body {
-            font-family: -apple-system, sans-serif;
-            background: var(--tg-bg);
-            color: var(--tg-text);
-            margin: 0; padding-bottom: 80px;
-            overflow-x: hidden;
-        }
-
-        /* Header phong cách hiện đại */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: sans-serif; background: var(--tg-bg); color: var(--tg-text); margin: 0; padding-bottom: 80px; }
+        
+        /* Profile Header */
         .header {
-            background: linear-gradient(135deg, #2563eb, #1d4b73);
-            padding: 30px 20px;
-            text-align: center;
-            border-bottom-left-radius: 35px;
-            border-bottom-right-radius: 35px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #1d4ed8, #1e40af);
+            padding: 30px 20px; text-align: center;
+            border-bottom-left-radius: 35px; border-bottom-right-radius: 35px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
-
-        .balance-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1.5px; }
-        .balance-val { font-size: 38px; font-weight: 800; color: var(--gold); margin: 5px 0; }
-
-        .content { padding: 20px; }
-        .card {
-            background: var(--tg-secondary);
-            border-radius: 24px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .btn-main {
-            background: #3b82f6; color: #fff; border: none;
-            width: 100%; padding: 18px; border-radius: 16px;
-            font-size: 18px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-        }
-        .btn-main:active { transform: scale(0.98); }
-
-        /* Bottom Nav Bar */
-        .bottom-nav {
-            position: fixed; bottom: 0; width: 100%;
-            background: var(--tg-secondary);
-            display: flex; height: 70px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-        }
-        .nav-item {
-            flex: 1; display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            font-size: 12px; opacity: 0.6;
-        }
-        .nav-item.active { color: var(--accent); opacity: 1; font-weight: bold; }
-        .nav-icon { font-size: 22px; margin-bottom: 4px; }
-
+        .user-info { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
+        #avatar { width: 48px; height: 48px; background: var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #000; font-weight: bold; border: 2px solid white; }
+        
+        .balance-val { font-size: 40px; font-weight: 800; color: var(--gold); margin: 5px 0; }
+        .card { background: var(--tg-sec); border-radius: 24px; padding: 20px; margin: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        
+        .btn-main { background: var(--accent); color: white; border: none; width: 100%; padding: 18px; border-radius: 16px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(59,130,246,0.3); }
+        
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: var(--tg-sec); display: flex; height: 70px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; opacity: 0.6; color: var(--tg-text); cursor: pointer; }
+        .nav-item.active { opacity: 1; color: var(--accent); font-weight: bold; }
         .hidden { display: none; }
-        input, select {
-            width: 100%; padding: 15px; margin: 10px 0;
-            background: rgba(0,0,0,0.2); border: 1px solid #334155;
-            border-radius: 12px; color: #fff; box-sizing: border-box;
-        }
+        input, select { width: 100%; padding: 15px; margin: 10px 0; background: rgba(0,0,0,0.2); border: 1px solid #334155; border-radius: 12px; color: #fff; }
     </style>
 </head>
 <body>
 
     <header class="header">
-        <div class="balance-label">Tài khoản khả dụng</div>
-        <div id="balance" class="balance-val">0 🪙</div>
+        <div class="user-info">
+            <div id="avatar">?</div>
+            <div style="text-align: left;">
+                <div id="u-name" style="font-weight: bold;">Đang tải...</div>
+                <div id="u-username" style="font-size: 12px; opacity: 0.7;">@username</div>
+            </div>
+        </div>
+        <div style="font-size: 12px; opacity: 0.8; letter-spacing: 1px;">SỐ DƯ COINS</div>
+        <div id="balance" class="balance-val">0</div>
         <div id="vnd" style="opacity: 0.8; font-size: 14px;">≈ 0 VNĐ</div>
     </header>
 
-    <div class="content">
-        <div id="tab-play" class="tab-content">
-            <div class="card" style="display: flex; justify-content: space-around; text-align: center;">
-                <div><small style="opacity: 0.6;">Lượt Free</small><div id="spins" style="font-size: 20px; font-weight: bold; color: var(--accent);">0</div></div>
-                <div><small style="opacity: 0.6;">Đã xem Ads</small><div id="ads" style="font-size: 20px; font-weight: bold; color: #f87171;">0/15</div></div>
-            </div>
-            <button class="btn-main" onclick="handleClaim()">NHẬN XU NGAY</button>
-            <p style="text-align: center; font-size: 12px; opacity: 0.5; margin-top: 15px;">Mẹo: Hết lượt free hãy xem quảng cáo để nhận thêm!</p>
+    <div id="tab-play" class="content">
+        <div class="card" style="display: flex; justify-content: space-around; text-align: center;">
+            <div><small style="opacity: 0.6;">Lượt Free</small><div id="spins" style="font-size: 20px; font-weight: bold; color: var(--accent);">0</div></div>
+            <div><small style="opacity: 0.6;">QC hôm nay</small><div id="ads" style="font-size: 20px; font-weight: bold; color: #f87171;">0/15</div></div>
         </div>
+        <div style="padding: 0 20px;"><button class="btn-main" onclick="handleClaim()">NHẬN XU NGAY</button></div>
+    </div>
 
-        <div id="tab-ref" class="tab-content hidden">
-            <div class="card">
-                <h3>👥 Mời Bạn Bè</h3>
-                <p style="font-size: 14px; opacity: 0.7;">Nhận 10.000 xu cho mỗi bạn bè tham gia.</p>
-                <input type="text" id="ref-url" readonly onclick="this.select()">
-                <button class="btn-main" style="background: #10b981; box-shadow: none;" onclick="copyRef()">COPY LINK MỜI</button>
-            </div>
+    <div id="tab-ref" class="content hidden">
+        <div class="card">
+            <h3>👥 Mời Bạn Bè</h3>
+            <p style="font-size: 14px; opacity: 0.7;">Nhận 10.000 xu cho mỗi người bạn tham gia qua link.</p>
+            <input type="text" id="ref-url" readonly onclick="this.select()">
+            <button class="btn-main" style="background: #10b981;" onclick="copyRef()">COPY LINK</button>
         </div>
+    </div>
 
-        <div id="tab-withdraw" class="tab-content hidden">
-            <div class="card">
-                <h3>💳 Rút Tiền</h3>
-                <select id="w-method">
-                    <option value="Momo">Ví Momo</option>
-                    <option value="Bank">Ngân Hàng</option>
-                </select>
-                <input type="number" id="w-amount" placeholder="Số tiền VNĐ">
-                <input type="text" id="w-details" placeholder="Số điện thoại hoặc Số tài khoản">
-                <button class="btn-main" style="background: var(--gold); box-shadow: none; color: #000;" onclick="doWithdraw()">GỬI YÊU CẦU</button>
-            </div>
+    <div id="tab-withdraw" class="content hidden">
+        <div class="card">
+            <h3>💳 Rút Tiền</h3>
+            <select id="w-method">
+                <option value="Momo">Ví MoMo</option>
+                <option value="Bank">Ngân Hàng</option>
+            </select>
+            <input type="number" id="w-amount" placeholder="Số tiền VNĐ (Ví dụ: 20000)">
+            <input type="text" id="w-details" placeholder="Số điện thoại hoặc STK">
+            <button class="btn-main" style="background: var(--gold); color: #000;" onclick="doWithdraw()">GỬI YÊU CẦU</button>
         </div>
     </div>
 
     <nav class="bottom-nav">
-        <div id="n-play" class="nav-item active" onclick="switchTab('play')"><span class="nav-icon">🎰</span>Chơi</div>
-        <div id="n-ref" class="nav-item" onclick="switchTab('ref')"><span class="nav-icon">👥</span>Bạn bè</div>
-        <div id="n-withdraw" class="nav-item" onclick="switchTab('withdraw')"><span class="nav-icon">💳</span>Ví</div>
+        <div id="n-play" class="nav-item active" onclick="switchTab('play')"><span>🎰</span><span>Chơi</span></div>
+        <div id="n-ref" class="nav-item" onclick="switchTab('ref')"><span>👥</span><span>Mời Bạn</span></div>
+        <div id="n-withdraw" class="nav-item" onclick="switchTab('withdraw')"><span>💳</span><span>Rút Tiền</span></div>
     </nav>
 
     <script>
@@ -129,7 +94,6 @@
         const user = tg.initDataUnsafe.user;
         let adController, botName = "";
 
-        // 1. Khởi tạo đồng bộ
         async function init() {
             const cfg = await (await fetch('/api/config')).json();
             botName = cfg.botUsername;
@@ -137,7 +101,6 @@
             updateStatus();
         }
 
-        // 2. Tải dữ liệu & Nhận diện Telegram
         async function updateStatus() {
             if (!user) return;
             const res = await fetch('/api/status', {
@@ -151,19 +114,23 @@
                 })
             });
             const d = await res.json();
-            document.getElementById('balance').innerText = d.totalCoins.toLocaleString() + ' 🪙';
+            
+            // Hiển thị Username và Name
+            document.getElementById('u-name').innerText = d.name;
+            document.getElementById('u-username').innerText = d.username !== 'n/a' ? '@' + d.username : '@no_user';
+            document.getElementById('avatar').innerText = d.name.charAt(0).toUpperCase();
+
+            // Hiển thị số dư và lượt
+            document.getElementById('balance').innerText = d.totalCoins.toLocaleString();
             document.getElementById('vnd').innerText = `≈ ${(d.totalCoins/1000).toLocaleString()} VNĐ`;
             document.getElementById('spins').innerText = d.spinsLeft;
             document.getElementById('ads').innerText = d.adsWatchedToday + '/15';
             document.getElementById('ref-url').value = `https://t.me/${botName}/app?startapp=${user.id}`;
         }
 
-        // 3. Xử lý nhận xu
         async function handleClaim() {
             haptic('light');
-            const spins = parseInt(document.getElementById('spins').innerText);
-            if (spins > 0) return callClaim();
-            
+            if (parseInt(document.getElementById('spins').innerText) > 0) return callClaim();
             if (adController) {
                 adController.show().then(() => callClaim()).catch(() => tg.showAlert("Bạn chưa xem hết QC!"));
             }
@@ -178,17 +145,16 @@
             const r = await res.json();
             if (r.success) {
                 haptic('success');
-                tg.showAlert(`🎉 +${r.lucky.toLocaleString()} xu!`);
+                tg.showAlert(`🎉 Chúc mừng! Bạn nhận được ${r.lucky.toLocaleString()} xu.`);
                 updateStatus();
             } else tg.showAlert(r.message);
         }
 
-        // 4. Rút tiền
         async function doWithdraw() {
             const amount = document.getElementById('w-amount').value;
             const details = document.getElementById('w-details').value;
-            if(!amount || !details) return tg.showAlert("Vui lòng điền đủ!");
-
+            if(!amount || !details) return tg.showAlert("Vui lòng nhập đầy đủ!");
+            
             const res = await fetch('/api/withdraw', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -201,15 +167,14 @@
             });
             const r = await res.json();
             if (r.success) {
-                tg.showConfirm("✅ Đã gửi đơn rút! Admin sẽ duyệt sớm.");
+                tg.showAlert("✅ Gửi yêu cầu thành công!");
                 updateStatus();
             } else tg.showAlert(r.message);
         }
 
-        // Tiện ích UI
         function switchTab(t) {
             haptic('light');
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('.content').forEach(c => c.classList.add('hidden'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('tab-'+t).classList.remove('hidden');
             document.getElementById('n-'+t).classList.add('active');
@@ -217,12 +182,12 @@
 
         function haptic(s) { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(s); }
         function copyRef() {
-            const input = document.getElementById('ref-url');
-            input.select(); document.execCommand('copy');
-            tg.showAlert("Đã copy link mời!");
+            document.getElementById('ref-url').select();
+            document.execCommand('copy');
+            tg.showAlert("Đã sao chép link mời!");
         }
 
-        init(); tg.expand();
+        init(); tg.expand(); tg.ready();
     </script>
 </body>
 </html>
