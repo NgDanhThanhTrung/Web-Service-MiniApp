@@ -10,6 +10,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Kết nối MongoDB
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log('✅ Connected to Shared MongoDB'))
     .catch(err => console.error('❌ DB Connection Error:', err));
@@ -22,13 +23,21 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-// 2. Status & Referral Logic
+// 2. Status & Referral Logic (Nâng cấp nhận diện ID/Username)
 app.post('/api/status', async (req, res) => {
     const { telegramId, username, name, refId } = req.body;
     const today = new Date().toDateString();
+    
     try {
-        let user = await User.findOne({ telegramId });
+        // Cập nhật thông tin mới nhất của User mỗi khi họ vào App
+        let user = await User.findOneAndUpdate(
+            { telegramId },
+            { $set: { username: username || 'n/a', name: name || 'Người dùng' } },
+            { new: true }
+        );
+
         if (!user) {
+            // Nếu là người dùng mới
             user = new User({ telegramId, username, name });
             if (refId && refId !== telegramId) {
                 const boss = await User.findOne({ telegramId: refId });
@@ -36,7 +45,7 @@ app.post('/api/status', async (req, res) => {
                     boss.totalCoins += 10000;
                     boss.refs += 1;
                     await boss.save();
-                    user.spinsLeft += 2;
+                    user.spinsLeft += 2; // Người được mời nhận thêm 2 lượt
                 }
             }
             await user.save();
@@ -52,7 +61,7 @@ app.post('/api/status', async (req, res) => {
     } catch (e) { res.status(500).json({ error: "DB Error" }); }
 });
 
-// 3. Claim Xu
+// 3. Claim Xu (Giữ nguyên full logic)
 app.post('/api/claim', async (req, res) => {
     try {
         const user = await User.findOne({ telegramId: req.body.telegramId });
@@ -73,7 +82,7 @@ app.post('/api/claim', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// 4. Rút tiền & Thông báo Admin
+// 4. Rút tiền & Thông báo Admin (Markdown chuyên nghiệp)
 app.post('/api/withdraw', async (req, res) => {
     const { telegramId, amountVnd, method, details } = req.body;
     try {
@@ -85,7 +94,11 @@ app.post('/api/withdraw', async (req, res) => {
         user.totalCoins -= cost;
         await user.save();
 
-        const text = `💰 **YÊU CẦU RÚT TIỀN**\n👤: ${user.name} (@${user.username})\n💵: ${Number(amountVnd).toLocaleString()} VNĐ\n🏦: ${method}\n📝: \`${details}\``;
+        const text = `💰 **YÊU CẦU RÚT TIỀN**\n` +
+                     `👤: ${user.name} (@${user.username})\n` +
+                     `💵: ${Number(amountVnd).toLocaleString()} VNĐ\n` +
+                     `🏦: ${method}\n` +
+                     `📝: \`${details}\``;
         
         fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -96,7 +109,6 @@ app.post('/api/withdraw', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// 5. Routes giao diện
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
 
