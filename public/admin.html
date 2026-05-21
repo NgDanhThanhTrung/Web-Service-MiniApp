@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Tài Khoản B</title>
+    <title>Admin Panel - Hệ Thống Đồng Bộ</title>
     <style>
         :root { --bg: #0b0e11; --card: #1e2329; --gold: #f1b90c; --green: #2ebd85; --text: #eaecef; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
@@ -22,8 +22,6 @@
 
         .btn-done { background: var(--green); color: white; font-size: 12px; }
         .status-ok { color: var(--green); font-weight: bold; }
-        .unit-ton { color: #0088cc; font-weight: bold; }
-        .unit-vnd { color: #f0b90b; font-weight: bold; }
         .info-cell { max-width: 300px; word-wrap: break-word; font-size: 13px; color: #848e9c; }
         
         @media (max-width: 768px) {
@@ -36,15 +34,15 @@
     
     <div class="header-tools">
         <input type="password" id="pass" placeholder="Mật khẩu Admin">
-        <button class="btn-load" onclick="loadData()">🔄 TẢI DỮ LIỆU THỜI GIAN THỰC</button>
+        <button class="btn-load" onclick="loadData()">🔄 TẢI DỮ LIỆU ĐỒNG BỘ</button>
     </div>
 
-    <h2>💰 DANH SÁCH RÚT TIỀN (CHỜ DUYỆT)</h2>
+    <h2>💰 YÊU CẦU RÚT TIỀN</h2>
     <table id="withdrawTable">
-        <tr><td colspan="6" style="text-align:center;">Vui lòng nhập pass và ấn tải dữ liệu</td></tr>
+        <tr><td colspan="6" style="text-align:center;">Vui lòng nhập mật khẩu và ấn tải dữ liệu</td></tr>
     </table>
 
-    <h2>👥 TOP 100 NGƯỜI DÙNG NHIỀU XU NHẤT</h2>
+    <h2>👥 TOP 100 NGƯỜI DÙNG (DỮ LIỆU BOT)</h2>
     <table id="userTable"></table>
 
     <script>
@@ -54,58 +52,57 @@
 
             try {
                 const res = await fetch(`/api/admin/all-data?pass=${pass}`);
-                if(!res.ok) throw new Error("Mật khẩu sai hoặc có lỗi!");
+                if(!res.ok) throw new Error("Mật khẩu sai hoặc có lỗi server!");
                 const data = await res.json();
 
-                // 1. Render bảng rút tiền
+                // 1. Render bảng rút tiền (Khớp với Schema mới)
                 let wHtml = `<tr>
                     <th>Ngày yêu cầu</th>
-                    <th>Tên</th>
-                    <th>Yêu cầu rút</th>
-                    <th>Chi phí (Xu)</th>
+                    <th>Tên người dùng</th>
+                    <th>Số Xu Rút</th>
                     <th>Cổng thanh toán</th>
                     <th>Thông tin chi tiết</th>
-                    <th>Hành động</th>
+                    <th>Trạng thái</th>
                 </tr>`;
 
                 data.withdraws.forEach(w => {
                     const date = new Date(w.createdAt).toLocaleString('vi-VN');
-                    const unitClass = w.unit === 'TON' ? 'unit-ton' : 'unit-vnd';
                     const isPending = w.status === 'Chờ duyệt';
 
                     wHtml += `<tr>
                         <td>${date}</td>
-                        <td><b>${w.name}</b></td>
-                        <td class="${unitClass}">${w.amountReq.toLocaleString()} ${w.unit}</td>
-                        <td>${w.coinCost.toLocaleString()}</td>
+                        <td><b>${w.name}</b><br><small style="color:#666">${w.userId}</small></td>
+                        <td style="color:var(--gold); font-weight:bold;">${w.amountXu.toLocaleString()} XU</td>
                         <td>${w.method}</td>
                         <td class="info-cell">${w.address}</td>
                         <td>
                             ${isPending ? 
-                                `<button class="btn-done" onclick="approve('${w._id}')">DUYỆT XONG</button>` : 
-                                `<span class="status-ok">✅ HOÀN TẤT</span>`
+                                `<button class="btn-done" onclick="approve('${w._id}')">XÁC NHẬN CHUYỂN</button>` : 
+                                `<span class="status-ok">✅ ĐÃ THANH TOÁN</span>`
                             }
                         </td>
                     </tr>`;
                 });
                 document.getElementById('withdrawTable').innerHTML = wHtml;
 
-                // 2. Render bảng người dùng
+                // 2. Render bảng người dùng (Đồng bộ trường dữ liệu BOT)
                 let uHtml = `<tr>
-                    <th>Top</th>
-                    <th>Tên người dùng</th>
-                    <th>Số dư (Xu)</th>
+                    <th>Hạng</th>
+                    <th>Tên người dùng (@username)</th>
+                    <th>Số dư (totalCoins)</th>
+                    <th>QC Hôm Nay</th>
                     <th>Số Ref</th>
-                    <th>ID Telegram</th>
+                    <th>Telegram ID</th>
                 </tr>`;
 
                 data.users.forEach((u, index) => {
                     uHtml += `<tr>
                         <td>${index + 1}</td>
-                        <td>${u.first_name}</td>
-                        <td style="color:var(--gold); font-weight:bold;">${u.coins.toLocaleString()}</td>
+                        <td><b>${u.name || u.first_name}</b><br><small>@${u.username}</small></td>
+                        <td style="color:var(--gold); font-weight:bold;">${(u.totalCoins || 0).toLocaleString()}</td>
+                        <td>${u.adsWatchedToday || 0}/5</td>
                         <td>${u.refs || 0}</td>
-                        <td style="color:#666;">${u.id}</td>
+                        <td style="color:#666;">${u.telegramId || u.id}</td>
                     </tr>`;
                 });
                 document.getElementById('userTable').innerHTML = uHtml;
@@ -116,7 +113,7 @@
         }
 
         async function approve(id) {
-            if(!confirm("Xác nhận đã chuyển tiền cho người dùng này?")) return;
+            if(!confirm("Xác nhận bạn đã chuyển khoản thành công?")) return;
             
             const pass = document.getElementById('pass').value;
             try {
@@ -127,7 +124,7 @@
                 });
                 
                 if(res.ok) {
-                    loadData(); // Tải lại bảng sau khi duyệt
+                    loadData();
                 } else {
                     alert("Lỗi khi duyệt đơn!");
                 }
