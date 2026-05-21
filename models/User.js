@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+
 const userSchema = new mongoose.Schema({
     telegramId: { type: String, required: true, unique: true, index: true },
     username: { type: String, default: 'n/a' },
@@ -9,4 +10,5 @@ const userSchema = new mongoose.Schema({
     lastActiveDay: { type: String, default: new Date().toDateString() },
     refs: { type: Number, default: 0 }
 }, { timestamps: true });
+
 module.exports = mongoose.model('User', userSchema);
