@@ -1,7 +1,3 @@
-/**
- * SIÊU CẤP KIẾM XU - PHIÊN BẢN V2 (DATABASE SYNC)
- * Khôi phục đầy đủ /account và đồng bộ ADSGRAM_BLOCK_ID
- */
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const mongoose = require('mongoose');
@@ -10,14 +6,13 @@ const path = require('path');
 const XLSX = require('xlsx');
 
 const app = express();
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = parseInt(process.env.ADMIN_ID);
-const ADMIN_PASS = process.env.ADMIN_PASS || "admin123";
-const MONGODB_URI = process.env.MONGODB_URI;
-const MY_APP_LINK = process.env.MY_APP_LINK;
-const ADSGRAM_BLOCK_ID = process.env.ADSGRAM_BLOCK_ID;
+const { 
+    BOT_TOKEN, ADMIN_ID, ADMIN_PASS, 
+    ADSGRAM_BLOCK_ID, BOT_USERNAME, 
+    MONGODB_URI, MY_APP_LINK 
+} = process.env;
 
-// Kết nối Database
+// Kết nối MongoDB
 mongoose.connect(MONGODB_URI).then(() => console.log('✅ MongoDB Connected'));
 
 const User = require('./models/User');
@@ -27,20 +22,20 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- HỆ THỐNG QUẢN TRỊ (KHÔI PHỤC) ---
+// --- CHỨC NĂNG ADMIN /ACCOUNT ---
 app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
 
 app.get('/api/admin/users', async (req, res) => {
-    if (req.query.pass !== ADMIN_PASS) return res.status(403).send("Từ chối truy cập");
+    if (req.query.pass !== ADMIN_PASS) return res.status(403).send("Sai mật khẩu Admin");
     const users = await User.find().sort({ coins: -1 });
     res.json(users);
 });
 
 app.get('/api/config', (req, res) => {
-    res.json({ blockId: ADSGRAM_BLOCK_ID });
+    res.json({ blockId: ADSGRAM_BLOCK_ID, botUser: BOT_USERNAME });
 });
 
-// API 1: Đồng bộ User & Referral (10,000 Xu cho người mời)
+// --- API XỬ LÝ NGƯỜI DÙNG ---
 app.post('/api/user-status', async (req, res) => {
     const { id, first_name, username, start_param } = req.body;
     try {
@@ -49,74 +44,70 @@ app.post('/api/user-status', async (req, res) => {
 
         if (!user) {
             user = new User({ id, first_name, username, lastActiveDate: today });
+            // Thưởng giới thiệu 10k xu
             if (start_param && parseInt(start_param) !== id) {
                 const inviter = await User.findOne({ id: parseInt(start_param) });
                 if (inviter) {
                     inviter.coins += 10000;
                     inviter.refs += 1;
                     await inviter.save();
-                    user.spinsLeft += 5; 
+                    user.spinsLeft += 5; // Người mới được 5 lượt
                 }
             }
             await user.save();
         } else if (user.lastActiveDate !== today) {
-            user.spinsLeft = 10; 
+            user.spinsLeft = 10; // Reset lượt quay mỗi ngày
+            user.dailyAdsCount = 0;
             user.lastActiveDate = today;
             await user.save();
         }
         res.json(user);
-    } catch (err) { res.status(500).json(err); }
+    } catch (e) { res.status(500).json(e); }
 });
 
-// API 2: Nhận Xu (Action: spin hoặc ads)
+// API Nhận Xu (Quay hoặc Xem QC)
 app.post('/api/action', async (req, res) => {
     const { id, action } = req.body;
-    try {
-        const user = await User.findOne({ id });
-        if (!user) return res.status(404).json({ ok: false });
+    const user = await User.findOne({ id });
+    if (!user) return res.status(404).json({ ok: false });
 
-        if (action === 'spin' && user.spinsLeft <= 0) {
-            return res.json({ ok: false, msg: "Hết lượt quay miễn phí!" });
-        }
+    if (action === 'spin' && user.spinsLeft <= 0) return res.json({ ok: false, msg: "Hết lượt quay!" });
 
-        const lucky = Math.floor(Math.random() * (50000 - 500 + 1)) + 500;
-        user.coins += lucky;
-        if (action === 'spin') user.spinsLeft -= 1;
-        
-        await user.save();
-        res.json({ ok: true, lucky, coins: user.coins, spinsLeft: user.spinsLeft });
-    } catch (err) { res.status(500).json({ ok: false }); }
+    const lucky = Math.floor(Math.random() * (50000 - 500 + 1)) + 500;
+    user.coins += lucky;
+    if (action === 'spin') user.spinsLeft -= 1;
+    if (action === 'ads') user.dailyAdsCount += 1;
+    
+    await user.save();
+    res.json({ ok: true, lucky, coins: user.coins, spinsLeft: user.spinsLeft });
 });
 
-// API 3: Rút tiền (1000 Xu = 1 VNĐ)
+// API Rút tiền (1000 xu = 1 VNĐ)
 app.post('/api/withdraw', async (req, res) => {
     const { id, amountVnd, method, address } = req.body;
-    try {
-        const user = await User.findOne({ id });
-        const coinCost = amountVnd * 1000;
-        if (!user || user.coins < coinCost) return res.json({ ok: false, msg: "Không đủ xu!" });
+    const user = await User.findOne({ id });
+    const cost = parseInt(amountVnd) * 1000;
 
-        user.coins -= coinCost;
-        await user.save();
+    if (!user || user.coins < cost) return res.json({ ok: false, msg: "Số dư xu không đủ!" });
 
-        const msg = `💰 *YÊU CẦU RÚT TIỀN*\n👤: ${user.first_name} (@${user.username})\n💵: ${amountVnd.toLocaleString()} VNĐ\n🏦: ${method}\n📍: \`${address}\``;
-        bot.telegram.sendMessage(ADMIN_ID, msg, { parse_mode: 'Markdown' });
-        res.json({ ok: true });
-    } catch (err) { res.status(500).json({ ok: false }); }
+    user.coins -= cost;
+    await user.save();
+
+    const msg = `💰 *YÊU CẦU RÚT TIỀN*\n👤: ${user.first_name}\n💵: ${parseInt(amountVnd).toLocaleString()} VNĐ\n🏦: ${method}\n📍: \`${address}\``;
+    bot.telegram.sendMessage(ADMIN_ID, msg, { parse_mode: 'Markdown' });
+    res.json({ ok: true });
 });
 
-// Lệnh Export Excel (Cho Bot)
+// --- CHỨC NĂNG BACKUP EXCEL QUA BOT ---
 bot.command('export', async (ctx) => {
-    if (ctx.from.id !== ADMIN_ID) return;
+    if (ctx.from.id !== parseInt(ADMIN_ID)) return;
     const users = await User.find().lean();
     const ws = XLSX.utils.json_to_sheet(users);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Users");
-    ctx.replyWithDocument({ source: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }), filename: 'Users_Backup.xlsx' });
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    ctx.replyWithDocument({ source: buf, filename: 'User_Backup.xlsx' });
 });
-
-// Anti-sleep cơ bản
-setInterval(() => { require('https').get(MY_APP_LINK); }, 300000);
 
 bot.start((ctx) => {
     ctx.reply(`Chào mừng ${ctx.from.first_name}!`, Markup.inlineKeyboard([
@@ -124,6 +115,12 @@ bot.start((ctx) => {
     ]));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server Port: ${PORT}`));
+// Anti-sleep: Tự động gọi link app mỗi 5p để Render không tắt
+setInterval(() => {
+    if (MY_APP_LINK) {
+        require('https').get(MY_APP_LINK, (res) => {}).on('error', (e) => {});
+    }
+}, 300000);
+
 bot.launch();
+app.listen(process.env.PORT || 3000, () => console.log("🚀 Server is running!"));
