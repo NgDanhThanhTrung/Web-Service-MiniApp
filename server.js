@@ -1,74 +1,153 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-const User = require('./models/User');
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Siêu Cấp Kiếm Xu</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="balance-card">
+                <small>TỔNG TÀI SẢN (1000 XU = 1 VNĐ)</small>
+                <h1 id="b-coins">0</h1>
+                <p id="b-vnd">≈ 0 VNĐ</p>
+            </div>
+        </header>
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+        <div class="tabs">
+            <button class="tab-btn active" onclick="openTab('play')">🎡 KIẾM XU</button>
+            <button class="tab-btn" onclick="openTab('ref')">👥 MỜI BẠN</button>
+            <button class="tab-btn" onclick="openTab('bank')">🏦 RÚT TIỀN</button>
+        </div>
 
-// Kết nối Database (Bắt buộc phải có biến MONGODB_URI trên Render)
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('✅ MongoDB Connected'))
-    .catch(err => console.error('❌ DB Error:', err));
+        <main class="main">
+            <div id="play" class="tab-content active">
+                <div class="stats-row">
+                    <div class="stat">Lượt Free: <b id="s-free">0</b></div>
+                    <div class="stat">Ads: <b id="s-ads">0/15</b></div>
+                </div>
+                <button class="btn-main" onclick="claim(false)">🎁 NHẬN XU FREE</button>
+                <button class="btn-ads" onclick="showAds()">📺 XEM QC (RANDOM 500-50K)</button>
+            </div>
 
-// Định tuyến cho trang Admin (Địa chỉ: /account)
-app.get('/account', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/admin.html'));
-});
+            <div id="ref" class="tab-content">
+                <div class="ref-box">
+                    <h3>👥 Mời Bạn Nhận 10.000 Xu</h3>
+                    <p>Gửi link cho bạn bè, bạn nhận 10k xu, bạn bè nhận 2 lượt free ngay khi vào app.</p>
+                    <input type="text" id="ref-link" readonly>
+                    <button class="btn-copy" onclick="copyLink()">SAO CHÉP LINK</button>
+                </div>
+            </div>
 
-// Lấy cấu hình từ Render Environment
-app.get('/api/config', (req, res) => {
-    res.json({
-        adsgramId: process.env.ADSGRAM_BLOCK_ID,
-        botUsername: process.env.BOT_USERNAME
-    });
-});
+            <div id="bank" class="tab-content">
+                <div class="withdraw-form">
+                    <input type="number" id="w-amount" placeholder="Số tiền VNĐ (VD: 20000)">
+                    <select id="w-method">
+                        <option value="MoMo">Ví MoMo</option>
+                        <option value="Ngân hàng">Chuyển khoản (ATM)</option>
+                        <option value="Thẻ cào">Thẻ cào (Viettel/Mobi)</option>
+                    </select>
+                    <input type="text" id="w-info" placeholder="SĐT MoMo / Số tài khoản / Nhà mạng">
+                    <button class="btn-confirm" onclick="requestWithdraw()">GỬI YÊU CẦU</button>
+                </div>
+            </div>
+        </main>
+    </div>
 
-// API: Đồng bộ User từ Telegram
-app.post('/api/status', async (req, res) => {
-    const { telegramId, username, name } = req.body;
-    try {
-        let user = await User.findOneAndUpdate(
-            { telegramId },
-            { $set: { username: username || 'n/a', name: name || 'User' } },
-            { new: true, upsert: true }
-        );
-        res.json(user);
-    } catch (e) { res.status(500).json({ error: "Server Error" }); }
-});
+    <script>
+        const tg = window.Telegram.WebApp;
+        const user = tg.initDataUnsafe.user;
+        let adController;
 
-// API: Nhận xu ngẫu nhiên (500 - 50,000)
-app.post('/api/claim', async (req, res) => {
-    const { telegramId, isAds } = req.body;
-    try {
-        const user = await User.findOne({ telegramId });
-        if (!user) return res.status(404).json({ success: false });
-
-        if (!isAds && user.spinsLeft <= 0) {
-            return res.json({ success: false, message: "Hết lượt free, hãy xem quảng cáo!" });
+        async function init() {
+            const cfg = await (await fetch('/api/config')).json();
+            
+            // Logic Adsgram: URL chứa substring [userId] thông qua params
+            if (window.Adsgram) {
+                adController = window.Adsgram.init({ 
+                    blockId: cfg.adsgramId,
+                    params: { userId: user.id.toString() } // Adsgram sẽ tự động thêm vào URL
+                });
+            }
+            updateUI();
         }
 
-        const lucky = Math.floor(Math.random() * (50000 - 500 + 1)) + 500;
-        
-        if (isAds) user.adsWatchedToday += 1;
-        else user.spinsLeft -= 1;
+        async function updateUI() {
+            const res = await fetch('/api/status', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    telegramId: user.id.toString(), 
+                    username: user.username, 
+                    name: user.first_name,
+                    refId: tg.initDataUnsafe.start_param
+                })
+            });
+            const d = await res.json();
+            document.getElementById('b-coins').innerText = d.totalCoins.toLocaleString();
+            document.getElementById('b-vnd').innerText = `≈ ${(d.totalCoins/1000).toLocaleString()} VNĐ`;
+            document.getElementById('s-free').innerText = d.spinsLeft;
+            document.getElementById('s-ads').innerText = d.adsWatchedToday + '/15';
+            document.getElementById('ref-link').value = `https://t.me/${(await(await fetch('/api/config')).json()).botUsername}/app?startapp=${user.id}`;
+        }
 
-        user.totalCoins += lucky;
-        await user.save();
-        res.json({ success: true, lucky, user });
-    } catch (e) { res.status(500).json({ success: false }); }
-});
+        async function claim(isAds) {
+            tg.HapticFeedback.impactOccurred('medium');
+            const res = await fetch('/api/claim', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramId: user.id.toString(), isAds })
+            });
+            const r = await res.json();
+            if (r.success) {
+                tg.showAlert(`🎉 Chúc mừng! Bạn nhận được ${r.lucky.toLocaleString()} xu!`);
+                updateUI();
+            } else tg.showAlert(r.message);
+        }
 
-// API: Danh sách người dùng cho Admin
-app.get('/api/admin/users', async (req, res) => {
-    const { pass } = req.query;
-    if (pass !== process.env.ADMIN_PASS) return res.status(403).send("Forbidden");
-    const users = await User.find().sort({ totalCoins: -1 });
-    res.json(users);
-});
+        function showAds() {
+            if (!adController) return tg.showAlert("QC chưa sẵn sàng");
+            adController.show().then(() => claim(true)).catch(() => tg.showAlert("Xem hết QC để nhận xu!"));
+        }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 App running on port ${PORT}`));
+        async function requestWithdraw() {
+            const amount = document.getElementById('w-amount').value;
+            const method = document.getElementById('w-method').value;
+            const info = document.getElementById('w-info').value;
+            if(!amount || !info) return tg.showAlert("Vui lòng điền đủ!");
+
+            const res = await fetch('/api/withdraw', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegramId: user.id.toString(), amountVnd: amount, method, details: info })
+            });
+            const r = await res.json();
+            if(r.success) {
+                tg.showAlert("✅ Gửi yêu cầu rút thành công! Admin sẽ duyệt sớm.");
+                updateUI();
+            } else tg.showAlert(r.message);
+        }
+
+        function openTab(id) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function copyLink() {
+            const input = document.getElementById('ref-link');
+            input.select();
+            document.execCommand('copy');
+            tg.showAlert("Đã copy link mời!");
+        }
+
+        init(); tg.expand();
+    </script>
+</body>
+</html>
