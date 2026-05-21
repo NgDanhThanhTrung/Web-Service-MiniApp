@@ -1,34 +1,19 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Admin Panel</title>
-    <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; }
-        .box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background: #2481cc; color: white; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h2>👥 Quản lý người dùng</h2>
-        <input type="password" id="pass" placeholder="Admin Password">
-        <button onclick="loadUsers()">Tải dữ liệu</button>
-        <table>
-            <thead><tr><th>Telegram ID</th><th>Tên</th><th>Số dư</th></tr></thead>
-            <tbody id="list"></tbody>
-        </table>
-    </div>
+<head><title>Admin</title><link rel="stylesheet" href="style.css"></head>
+<body style="padding:20px;">
+    <h2>Quản lý người dùng</h2>
+    <input type="password" id="p" placeholder="Mật khẩu Admin">
+    <button onclick="load()">Xem danh sách</button>
+    <table border="1" id="t" style="width:100%; margin-top:20px; color:white;"></table>
     <script>
-        async function loadUsers() {
-            const p = document.getElementById('pass').value;
-            const res = await fetch(`/api/admin/users?pass=${p}`);
-            if(res.status === 403) return alert("Sai mật khẩu!");
+        async function load() {
+            const pass = document.getElementById('p').value;
+            const res = await fetch(`/api/admin/users?pass=${pass}`);
             const data = await res.json();
-            document.getElementById('list').innerHTML = data.map(u => `
-                <tr><td>${u.telegramId}</td><td>${u.name} (@${u.username})</td><td><b>${u.totalCoins.toLocaleString()}</b></td></tr>
-            `).join('');
+            let h = '<tr><th>Tên</th><th>Xu</th><th>Mời</th></tr>';
+            data.forEach(u => h += `<tr><td>${u.first_name}</td><td>${u.coins}</td><td>${u.refs}</td></tr>`);
+            document.getElementById('t').innerHTML = h;
         }
     </script>
 </body>
