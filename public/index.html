@@ -7,37 +7,39 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <header class="header">
-        <div class="user-info">
+    <header class="top-nav">
+        <div class="user-pill">
             <div id="avatar">?</div>
-            <div class="meta">
-                <div id="u-name">Đang tải...</div>
-                <div id="u-username">@username</div>
+            <div>
+                <div id="u-name">Loading...</div>
+                <div id="u-username">@user</div>
             </div>
         </div>
+    </header>
+
+    <main class="main-container">
         <div class="balance-card">
             <p>SỐ DƯ COINS</p>
             <h1 id="balance">0</h1>
             <p id="vnd">≈ 0 VNĐ</p>
         </div>
-    </header>
 
-    <div class="stats">
-        <div class="stat">Free: <b id="spins">0</b></div>
-        <div class="stat">Ads: <b id="ads">0/15</b></div>
-    </div>
+        <div class="grid-stats">
+            <div class="stat-item"><i class="fas fa-bolt"></i> <span id="spins">0</span> Lượt</div>
+            <div class="stat-item"><i class="fas fa-tv"></i> <span id="ads">0/15</span> Ads</div>
+        </div>
 
-    <div class="actions">
-        <button class="btn-main" onclick="claim(false)">🎁 NHẬN XU FREE</button>
-        <button class="btn-ads" onclick="showAds()">📺 XEM ADS NHẬN XU</button>
-    </div>
+        <button class="btn-main" onclick="handleClaim(false)">🎁 NHẬN XU FREE</button>
+        <button class="btn-ads" onclick="showAds()">📺 XEM QC NHẬN XU (RANDOM)</button>
+    </main>
 
-    <nav class="nav">
-        <div class="nav-item active">🎰 Chơi</div>
-        <div class="nav-item" onclick="tg.showAlert('Tính năng Referral đang nâng cấp!')">👥 Bạn bè</div>
-        <div class="nav-item" onclick="window.location.href='/account'">⚙️ Admin</div>
+    <nav class="bottom-bar">
+        <div class="nav-btn active"><i class="fas fa-coins"></i><span>Kiếm xu</span></div>
+        <div class="nav-btn" onclick="tg.showAlert('Tính năng rút tiền sắp ra mắt!')"><i class="fas fa-wallet"></i><span>Ví</span></div>
+        <div class="nav-btn" onclick="window.location.href='/account'"><i class="fas fa-user-cog"></i><span>Admin</span></div>
     </nav>
 
     <script>
@@ -48,11 +50,10 @@
         async function init() {
             const cfg = await (await fetch('/api/config')).json();
             if (window.Adsgram) ads = window.Adsgram.init({ blockId: cfg.adsgramId });
-            update();
+            updateUI();
         }
 
-        async function update() {
-            if (!user) return;
+        async function updateUI() {
             const res = await fetch('/api/status', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -60,7 +61,7 @@
             });
             const d = await res.json();
             document.getElementById('u-name').innerText = d.name;
-            document.getElementById('u-username').innerText = d.username !== 'n/a' ? '@'+d.username : '';
+            document.getElementById('u-username').innerText = d.username ? '@'+d.username : '';
             document.getElementById('avatar').innerText = d.name.charAt(0).toUpperCase();
             document.getElementById('balance').innerText = d.totalCoins.toLocaleString();
             document.getElementById('vnd').innerText = `≈ ${(d.totalCoins/1000).toLocaleString()} VNĐ`;
@@ -68,8 +69,8 @@
             document.getElementById('ads').innerText = d.adsWatchedToday + '/15';
         }
 
-        async function claim(isAds) {
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+        async function handleClaim(isAds) {
+            tg.HapticFeedback.impactOccurred('medium');
             const res = await fetch('/api/claim', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -78,13 +79,13 @@
             const r = await res.json();
             if (r.success) {
                 tg.showAlert(`🎉 +${r.lucky.toLocaleString()} xu!`);
-                update();
+                updateUI();
             } else tg.showAlert(r.message);
         }
 
         function showAds() {
             if (!ads) return tg.showAlert("QC chưa sẵn sàng");
-            ads.show().then(() => claim(true)).catch(() => tg.showAlert("Bạn chưa xem hết QC"));
+            ads.show().then(() => handleClaim(true)).catch(() => tg.showAlert("Xem hết QC để nhận xu!"));
         }
 
         init(); tg.expand();
