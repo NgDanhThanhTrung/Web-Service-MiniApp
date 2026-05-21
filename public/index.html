@@ -7,14 +7,13 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        /* CSS tích hợp làm mềm giao diện */
         :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
         
         .header { text-align: center; margin-bottom: 20px; }
         .user-info { color: var(--gold); font-size: 14px; margin-bottom: 10px; font-weight: bold; }
         
-        .balance-card { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #333; }
+        .balance-card { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         
         .tabs { display: flex; gap: 8px; margin: 20px 0; background: var(--card); padding: 5px; border-radius: 30px; }
         .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 25px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 13px; }
@@ -23,38 +22,38 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* Làm mềm các nút và đẩy xuống dưới */
         .action-group { display: flex; flex-direction: column; gap: 15px; margin-top: 40px; }
-        .btn-soft { padding: 18px; border-radius: 30px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        .btn-soft { padding: 18px; border-radius: 30px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; outline: none; }
         .btn-main { background: var(--gold); color: black; }
         .btn-ads { background: #2b3139; color: var(--gold); border: 1px solid var(--gold); }
-        .btn-soft:active { transform: scale(0.96); }
+        .btn-soft:active { transform: scale(0.96); opacity: 0.8; }
 
-        .soft-input { width: 100%; padding: 15px; border-radius: 20px; border: 1px solid #333; background: #1e2329; color: white; margin-bottom: 15px; box-sizing: border-box; outline: none; }
+        .soft-input { width: 100%; padding: 15px; border-radius: 20px; border: 1px solid #333; background: #1e2329; color: white; margin-bottom: 15px; box-sizing: border-box; outline: none; font-size: 14px; }
         
         .progress-box { background: var(--card); padding: 15px; border-radius: 20px; margin-bottom: 15px; text-align: center; border: 1px dashed #444; }
-        .bar-bg { width: 100%; height: 8px; background: #000; border-radius: 10px; margin-top: 10px; overflow: hidden; }
-        #bar-fill { width: 0%; height: 100%; background: var(--gold); transition: 0.5s; }
+        .bar-bg { width: 100%; height: 10px; background: #000; border-radius: 10px; margin-top: 10px; overflow: hidden; }
+        #bar-fill { width: 0%; height: 100%; background: var(--gold); transition: 1s cubic-bezier(0.4, 0, 0.2, 1); }
         
-        .stats-row { display: flex; justify-content: space-around; background: var(--card); padding: 15px; border-radius: 20px; }
+        .stats-row { display: flex; justify-content: space-around; background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #2b3139; }
+        .stat b { color: var(--gold); }
     </style>
 </head>
 <body>
     <div id="app">
         <header class="header">
             <div class="user-info">
-                👤 <span id="u-name">Đang tải...</span> (@<span id="u-user">...</span>)
+                👤 <span id="u-name">...</span> (@<span id="u-user">...</span>)
             </div>
             <div class="balance-card">
-                <small>TỔNG TÀI SẢN</small>
-                <h1 id="b-coins" style="margin: 5px 0;">0</h1>
-                <p id="b-vnd" style="margin: 0; color: #848e9c; font-size: 14px;">≈ 0 VNĐ</p>
+                <small style="letter-spacing: 1px; color: #848e9c;">TỔNG TÀI SẢN</small>
+                <h1 id="b-coins" style="margin: 5px 0; font-size: 32px;">0 XU</h1>
+                <p id="b-vnd" style="margin: 0; color: var(--gold); font-size: 16px; font-weight: 500;">≈ 0 VNĐ</p>
             </div>
         </header>
 
         <div class="tabs">
             <button class="tab-btn active" onclick="openTab(event, 'play')">🎡 KIẾM XU</button>
-            <button class="tab-btn" onclick="openTab(event, 'ref')">👥 MỜI BẠN</button>
+            <button class="tab-btn" onclick="event, openTab(event, 'ref')">👥 MỜI BẠN</button>
             <button class="tab-btn" onclick="openTab(event, 'bank')">🏦 RÚT TIỀN</button>
         </div>
 
@@ -62,41 +61,41 @@
             <div id="play" class="tab-content active">
                 <div class="stats-row">
                     <div class="stat">Lượt Quay: <b id="s-free">0</b></div>
-                    <div class="stat">Ads: <b id="s-ads">0</b>/5</div>
+                    <div class="stat">Đã xem: <b id="s-ads">0</b>/5 QC</div>
                 </div>
                 
                 <div class="action-group">
-                    <button class="btn-soft btn-main" onclick="claim('spin')">🎁 NHẬN XU FREE</button>
-                    <button class="btn-soft btn-ads" onclick="showAds()">📺 XEM QC NHẬN XU</button>
+                    <button class="btn-soft btn-main" onclick="claim('spin')">🎡 QUAY THƯỞNG FREE</button>
+                    <button class="btn-soft btn-ads" onclick="showAds()">📺 XEM QUẢNG CÁO (+XU)</button>
                 </div>
             </div>
 
             <div id="ref" class="tab-content">
                 <div class="progress-box" style="border-style: solid; border-color: var(--gold);">
-                    <h3 style="margin-top:0; color: var(--gold);">👥 Mời Bạn Nhận 100.000 Xu</h3>
-                    <p style="font-size: 12px; color: #848e9c; margin-bottom: 15px;">Mỗi người bạn tham gia qua link, bạn nhận ngay 100k xu.</p>
-                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center; font-size: 12px;">
+                    <h3 style="margin-top:0; color: var(--gold);">🎁 Thưởng Mời Bạn</h3>
+                    <p style="font-size: 13px; color: #848e9c; margin-bottom: 15px;">Nhận ngay <b>100.000 Xu</b> khi bạn bè tham gia qua link của bạn.</p>
+                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center; font-size: 12px; border-color: #474d57;">
                     <button class="btn-soft btn-main" style="width: 100%;" onclick="copyLink()">SAO CHÉP LINK</button>
                 </div>
             </div>
 
             <div id="bank" class="tab-content">
                 <div class="progress-box">
-                    <small>Điều kiện rút: Xem đủ 5 video QC (<span id="count-ads">0</span>/5)</small>
+                    <small>Tiến trình điều kiện rút (<span id="count-ads">0</span>/5 QC)</small>
                     <div class="bar-bg"><div id="bar-fill"></div></div>
                 </div>
 
                 <div class="withdraw-form">
-                    <input type="number" id="w-amount" class="soft-input" placeholder="Nhập số XU muốn rút (Min 300.000)">
+                    <input type="number" id="w-amount" class="soft-input" placeholder="Số XU muốn rút (Min 300.000)">
                     
                     <select id="w-method" class="soft-input">
-                        <option value="Ngân hàng">Ngân hàng / Ví VN</option>
-                        <option value="TON Wallet">Ví TON (Telegram)</option>
+                        <option value="Ngân hàng">Ngân hàng / Ví điện tử</option>
+                        <option value="TON Wallet">Ví TON (Telegram Wallet)</option>
                     </select>
 
-                    <textarea id="w-info" class="soft-input" style="height: 100px; border-radius: 20px; resize: none;" placeholder="STK, Tên Ngân hàng, Tên chủ thẻ..."></textarea>
+                    <textarea id="w-info" class="soft-input" style="height: 100px; resize: none;" placeholder="Nội dung: STK, Tên Ngân hàng, Chủ tài khoản..."></textarea>
                     
-                    <button class="btn-soft btn-main" style="width: 100%;" onclick="requestWithdraw()">GỬI YÊU CẦU RÚT</button>
+                    <button class="btn-soft btn-main" style="width: 100%;" onclick="requestWithdraw()">GỬI YÊU CẦU RÚT TIỀN</button>
                 </div>
             </div>
         </main>
@@ -104,54 +103,52 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        const userData = tg.initDataUnsafe.user || { id: 0, first_name: "Guest", username: "unknown" };
+        const userData = tg.initDataUnsafe.user || { id: 0, first_name: "Khách", username: "guest" };
         let adController;
-        let config = {};
 
         async function init() {
-            // Hiển thị Username ngay
             document.getElementById('u-name').innerText = userData.first_name;
             document.getElementById('u-user').innerText = userData.username || "no_user";
 
-            config = await (await fetch('/api/config')).json();
+            try {
+                const config = await (await fetch('/api/config')).json();
+                if (window.Adsgram) {
+                    adController = window.Adsgram.init({ 
+                        blockId: config.blockId,
+                        params: { userId: userData.id.toString() } 
+                    });
+                }
+                document.getElementById('ref-link').value = `https://t.me/${config.botUser}/app?startapp=${userData.id}`;
+            } catch (e) { console.error("Config error", e); }
             
-            // Khởi tạo Adsgram chạy ngầm với userId trong URL
-            if (window.Adsgram) {
-                adController = window.Adsgram.init({ 
-                    blockId: config.blockId,
-                    params: { userId: userData.id.toString() } 
-                });
-            }
             updateUI();
         }
 
         async function updateUI() {
-            const res = await fetch('/api/user-status', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    id: userData.id, 
-                    first_name: userData.first_name, 
-                    username: userData.username, 
-                    start_param: tg.initDataUnsafe.start_param
-                })
-            });
-            const d = await res.json();
-            
-            // Cập nhật số dư và stats
-            document.getElementById('b-coins').innerText = d.coins.toLocaleString() + " XU";
-            document.getElementById('b-vnd').innerText = `≈ ${(d.coins/1000).toLocaleString()} VNĐ`;
-            document.getElementById('s-free').innerText = d.spinsLeft;
-            
-            const watched = d.adsWatched || 0;
-            document.getElementById('s-ads').innerText = watched;
-            document.getElementById('count-ads').innerText = watched;
-            
-            // Cập nhật thanh tiến trình rút tiền
-            const progress = Math.min((watched / 5) * 100, 100);
-            document.getElementById('bar-fill').style.width = progress + '%';
-
-            document.getElementById('ref-link').value = `https://t.me/${config.botUser}/app?startapp=${userData.id}`;
+            try {
+                const res = await fetch('/api/user-status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        id: userData.id, 
+                        first_name: userData.first_name, 
+                        username: userData.username, 
+                        start_param: tg.initDataUnsafe.start_param
+                    })
+                });
+                const d = await res.json();
+                
+                document.getElementById('b-coins').innerText = d.coins.toLocaleString() + " XU";
+                document.getElementById('b-vnd').innerText = `≈ ${(d.coins/1000).toLocaleString()} VNĐ`;
+                document.getElementById('s-free').innerText = d.spinsLeft;
+                
+                const watched = d.adsWatched || 0;
+                document.getElementById('s-ads').innerText = watched;
+                document.getElementById('count-ads').innerText = watched;
+                
+                const progress = Math.min((watched / 5) * 100, 100);
+                document.getElementById('bar-fill').style.width = progress + '%';
+            } catch (e) { console.error("Update UI error", e); }
         }
 
         async function claim(type) {
@@ -162,16 +159,22 @@
             });
             const r = await res.json();
             if (r.ok) {
-                tg.showAlert(`🎉 +${r.lucky.toLocaleString()} xu!`);
+                tg.showAlert(`🎉 Chúc mừng! Bạn nhận được +${r.lucky.toLocaleString()} xu!`);
                 updateUI();
-            } else tg.showAlert(r.msg || "Hết lượt hoặc lỗi!");
+            } else tg.showAlert(r.msg || "Có lỗi xảy ra, vui lòng thử lại!");
         }
 
         function showAds() {
-            if (!adController) return tg.showAlert("QC chưa sẵn sàng...");
+            if (!adController) return tg.showAlert("Quảng cáo đang tải, vui lòng đợi...");
+            
             adController.show().then(() => {
-                claim('ads');
-            }).catch(() => tg.showAlert("Bạn chưa xem hết quảng cáo"));
+                // Sau khi xem xong, đợi 2.5s để server xử lý callback rồi mới update UI
+                tg.showAlert("✅ Cảm ơn bạn! Phần thưởng đang được xử lý...");
+                setTimeout(updateUI, 2500);
+            }).catch((err) => {
+                if (err && err.error === 'no_ads') tg.showAlert("Hiện tại chưa có quảng cáo, hãy thử lại sau ít phút!");
+                else tg.showAlert("Bạn cần xem hết quảng cáo mới có thể nhận quà!");
+            });
         }
 
         async function requestWithdraw() {
@@ -179,7 +182,7 @@
             const info = document.getElementById('w-info').value;
             const method = document.getElementById('w-method').value;
 
-            if(!amount || !info) return tg.showAlert("Vui lòng điền đủ thông tin!");
+            if(!amount || !info) return tg.showAlert("Vui lòng nhập đầy đủ số tiền và thông tin nhận tiền!");
 
             const res = await fetch('/api/withdraw', {
                 method: 'POST',
@@ -193,7 +196,7 @@
             });
             const r = await res.json();
             if(r.ok) {
-                tg.showAlert("✅ Đã gửi yêu cầu rút XU thành công!");
+                tg.showAlert("🚀 Gửi yêu cầu rút thành công! Vui lòng chờ quản trị viên duyệt.");
                 updateUI();
             } else tg.showAlert(r.msg);
         }
@@ -210,7 +213,7 @@
             const el = document.getElementById('ref-link');
             el.select();
             document.execCommand('copy');
-            tg.showAlert("Đã sao chép link mời nhận 100k XU!");
+            tg.showAlert("📋 Đã sao chép link mời!");
         }
 
         init(); 
