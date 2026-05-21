@@ -13,15 +13,13 @@ mongoose.connect(MONGODB_URI)
 
 const User = require('./models/User');
 
-// Schema Rút tiền: Điền trực tiếp và lấy từ Mongo
+// Schema Rút tiền: Cập nhật chỉ lưu số XU và thông tin thanh toán
 const WithdrawSchema = new mongoose.Schema({
     userId: Number,
     name: String,
-    amountReq: Number,  // Số tiền/Số TON yêu cầu
-    unit: String,       // "VND" hoặc "TON"
-    coinCost: Number,   // Tổng số xu bị trừ
-    method: String,     // Ngân hàng, Ví điện tử, TON Wallet
-    address: String,    // STK, Ngân hàng, hoặc Địa chỉ ví
+    amountXu: Number,    // Số XU yêu cầu rút (Min 300,000)
+    method: String,      // Ngân hàng, Ví điện tử, hoặc TON Wallet
+    address: String,     // STK hoặc địa chỉ ví
     status: { type: String, default: 'Chờ duyệt' },
     createdAt: { type: Date, default: Date.now }
 });
@@ -31,31 +29,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Giả lập tỷ giá TON (Có thể cập nhật số này tùy thời điểm)
-async function getTonPrice() {
-    return 180000; // 1 TON ≈ 180,000 VNĐ
-}
-
 // --- ĐIỀU HƯỚNG GIAO DIỆN ---
-
-// Cho phép truy cập giao diện từ cả trang chủ và /app
-app.get(['/', '/app'], (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/index.html'));
-});
-
-// Trang Admin
-app.get('/account', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/admin.html'));
-});
+app.get(['/', '/app'], (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
+app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
 
 // --- API FRONTEND ---
 
-app.get('/api/config', async (req, res) => {
-    const tonPrice = await getTonPrice();
+app.get('/api/config', (req, res) => {
     res.json({ 
         blockId: ADSGRAM_BLOCK_ID, 
-        botUser: BOT_USERNAME,
-        tonPrice: tonPrice
+        botUser: BOT_USERNAME 
     });
 });
 
@@ -66,12 +49,19 @@ app.post('/api/user-status', async (req, res) => {
         const today = new Date().toISOString().split('T')[0];
 
         if (!user) {
-            user = new User({ id, first_name, username, lastActiveDate: today, spinsLeft: 10 });
-            // Referral: Tặng 10.000 xu cho người mời
+            // Khởi tạo user mới với 0 adsWatched và 10 spins
+            user = new User({ 
+                id, first_name, username, 
+                lastActiveDate: today, 
+                spinsLeft: 10,
+                adsWatched: 0 
+            });
+
+            // Referral: Tặng 100.000 xu cho người mời
             if (start_param && parseInt(start_param) !== id) {
                 const inviter = await User.findOne({ id: parseInt(start_param) });
                 if (inviter) {
-                    inviter.coins += 10000;
+                    inviter.coins += 100000;
                     inviter.refs += 1;
                     await inviter.save();
                 }
@@ -89,45 +79,56 @@ app.post('/api/user-status', async (req, res) => {
 app.post('/api/action', async (req, res) => {
     const { id, action } = req.body;
     const user = await User.findOne({ id });
-    if (!user || (action === 'spin' && user.spinsLeft <= 0)) return res.json({ ok: false });
+    if (!user) return res.json({ ok: false });
 
+    // Logic cộng tiền ngẫu nhiên cho cả Spin và Ads
     const lucky = Math.floor(Math.random() * 49501) + 500;
-    user.coins += lucky;
-    if (action === 'spin') user.spinsLeft -= 1;
-    await user.save();
-    res.json({ ok: true, lucky });
-});
-
-// Lưu yêu cầu rút tiền với hạn mức mới
-app.post('/api/withdraw', async (req, res) => {
-    const { id, amountReq, unit, method, address } = req.body;
-    const user = await User.findOne({ id });
-    const tonPrice = await getTonPrice();
-
-    if (!user) return res.json({ ok: false, msg: "Không tìm thấy user" });
-
-    let coinCost = 0;
-    // Kiểm tra hạn mức
-    if (unit === 'VND') {
-        if (amountReq < 2000) return res.json({ ok: false, msg: "Tối thiểu 2,000 VNĐ" });
-        coinCost = amountReq * 1000;
-    } else {
-        if (amountReq < 0.0003) return res.json({ ok: false, msg: "Tối thiểu 0.0003 TON" });
-        coinCost = Math.round(amountReq * tonPrice * 1000);
+    
+    if (action === 'spin') {
+        if (user.spinsLeft <= 0) return res.json({ ok: false, msg: "Hết lượt quay" });
+        user.spinsLeft -= 1;
+    } 
+    
+    if (action === 'ads') {
+        // Cộng dồn số lần xem quảng cáo vào DB
+        user.adsWatched = (user.adsWatched || 0) + 1;
     }
 
-    if (user.coins < coinCost) return res.json({ ok: false, msg: `Cần ${coinCost.toLocaleString()} xu!` });
+    user.coins += lucky;
+    await user.save();
+    res.json({ ok: true, lucky, adsWatched: user.adsWatched });
+});
 
-    // Trừ tiền và lưu đơn
-    user.coins -= coinCost;
+// Lưu yêu cầu rút tiền với điều kiện: 300k xu + 5 video quảng cáo
+app.post('/api/withdraw', async (req, res) => {
+    const { id, amountXu, method, address } = req.body;
+    const user = await User.findOne({ id });
+
+    if (!user) return res.json({ ok: false, msg: "Lỗi người dùng" });
+
+    // 1. Kiểm tra số video quảng cáo đã xem
+    if ((user.adsWatched || 0) < 5) {
+        return res.json({ ok: false, msg: `Cần xem ít nhất 5 QC (Hiện có: ${user.adsWatched}/5)` });
+    }
+
+    // 2. Kiểm tra hạn mức xu tối thiểu (300,000)
+    if (amountXu < 300000) {
+        return res.json({ ok: false, msg: "Tối thiểu rút 300.000 XU" });
+    }
+
+    // 3. Kiểm tra số dư khả dụng
+    if (user.coins < amountXu) {
+        return res.json({ ok: false, msg: "Số dư xu không đủ" });
+    }
+
+    // Trừ tiền và tạo đơn rút
+    user.coins -= amountXu;
     await user.save();
 
     const newRequest = new Withdraw({ 
         userId: id, 
         name: user.first_name, 
-        amountReq, 
-        unit, 
-        coinCost, 
+        amountXu, 
         method, 
         address 
     });
