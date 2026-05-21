@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; }
+        :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
         
         .header { text-align: center; margin-bottom: 20px; }
@@ -15,96 +15,109 @@
         
         .balance-card { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         
-        .tabs { 
-            display: flex; 
-            gap: 8px; 
-            background: var(--card); 
-            padding: 10px 15px; 
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            right: 0; 
-            z-index: 1000;
-            border-top: 1px solid #333;
-            padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px));
+        /* Giao diện Task Card mới */
+        .task-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .task-card { 
+            background: var(--card); border: 1px solid #333; border-radius: 20px; 
+            padding: 15px; display: flex; align-items: center; gap: 15px; 
+            transition: 0.2s; cursor: pointer; 
         }
-        
+        .task-card:active { transform: scale(0.98); background: #2b3139; }
+        .task-icon { font-size: 24px; width: 45px; height: 45px; background: rgba(241,185,12,0.1); display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+        .task-info { flex: 1; }
+        .task-info h3 { margin: 0; font-size: 15px; color: var(--gold); }
+        .task-info p { margin: 3px 0 0; font-size: 11px; color: #848e9c; }
+        .task-action { background: var(--blue); color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+
+        .tabs { 
+            display: flex; gap: 8px; background: var(--card); padding: 10px 15px; 
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
+            border-top: 1px solid #333; padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px));
+        }
         .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 20px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 13px; }
         .tab-btn.active { background: #2b3139; color: var(--gold); font-weight: bold; }
 
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-
         .main { padding-bottom: 100px; }
 
-        .action-group { display: flex; flex-direction: column; gap: 15px; margin-top: 40px; }
-        .btn-soft { padding: 18px; border-radius: 30px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; outline: none; }
-        .btn-main { background: var(--gold); color: black; }
-        .btn-ads { background: #2b3139; color: var(--gold); border: 1px solid var(--gold); }
-        .btn-soft:active { transform: scale(0.96); opacity: 0.8; }
-
         .soft-input { width: 100%; padding: 15px; border-radius: 20px; border: 1px solid #333; background: #1e2329; color: white; margin-bottom: 15px; box-sizing: border-box; outline: none; font-size: 14px; }
-        
         .progress-box { background: var(--card); padding: 15px; border-radius: 20px; margin-bottom: 15px; text-align: center; border: 1px dashed #444; }
         .bar-bg { width: 100%; height: 10px; background: #000; border-radius: 10px; margin-top: 10px; overflow: hidden; }
         #bar-fill { width: 0%; height: 100%; background: var(--gold); transition: 1s cubic-bezier(0.4, 0, 0.2, 1); }
-        
-        .stats-row { display: flex; justify-content: space-around; background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #2b3139; }
-        .stat b { color: var(--gold); }
+
+        .btn-soft { padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; width: 100%; }
+        .btn-main { background: var(--gold); color: black; }
     </style>
 </head>
 <body>
     <div id="app">
         <header class="header">
-            <div class="user-info">
-                👤 <span id="u-name">...</span> (@<span id="u-user">...</span>)
-            </div>
+            <div class="user-info">👤 <span id="u-name">...</span> (@<span id="u-user">...</span>)</div>
             <div class="balance-card">
-                <small style="letter-spacing: 1px; color: #848e9c;">TỔNG TÀI SẢN</small>
+                <small style="color: #848e9c;">TỔNG TÀI SẢN</small>
                 <h1 id="b-coins" style="margin: 5px 0; font-size: 32px;">0 XU</h1>
-                <p id="b-vnd" style="margin: 0; color: var(--gold); font-size: 16px; font-weight: 500;">≈ 0 VNĐ</p>
+                <p id="b-vnd" style="margin: 0; color: var(--gold);">≈ 0 VNĐ</p>
             </div>
         </header>
 
         <main class="main">
             <div id="play" class="tab-content active">
-                <div class="stats-row">
-                    <div class="stat">Lượt Quay: <b id="s-free">0</b></div>
-                    <div class="stat">Đã xem: <b id="s-ads">0</b>/5 QC</div>
-                </div>
-                
-                <div class="action-group">
-                    <button class="btn-soft btn-main" onclick="claim('spin')">🎡 QUAY THƯỞNG FREE</button>
-                    <button class="btn-soft btn-ads" onclick="showAds()">📺 XEM QUẢNG CÁO (+XU)</button>
+                <button class="btn-soft btn-main" onclick="claim('spin')" style="margin-bottom: 20px;">🎡 QUAY THƯỞNG FREE (<span id="s-free">0</span>)</button>
+
+                <div class="task-list">
+                    <div class="task-card" onclick="triggerAd('video')">
+                        <div class="task-icon">🎬</div>
+                        <div class="task-info">
+                            <h3>Rewarded Video</h3>
+                            <p>Nhận ngay 75.000 Xu</p>
+                        </div>
+                        <div class="task-action">Xem</div>
+                    </div>
+
+                    <div class="task-card" onclick="triggerAd('interstitial')">
+                        <div class="task-icon">🖼️</div>
+                        <div class="task-info">
+                            <h3>Interstitial Ad</h3>
+                            <p>Nhận ngay 50.000 Xu</p>
+                        </div>
+                        <div class="task-action">Mở</div>
+                    </div>
+
+                    <div class="task-card" onclick="triggerAd('banner')">
+                        <div class="task-icon">🎫</div>
+                        <div class="task-info">
+                            <h3>Static Banner</h3>
+                            <p>Nhận ngay 25.000 Xu</p>
+                        </div>
+                        <div class="task-action">Xem</div>
+                    </div>
                 </div>
             </div>
 
             <div id="ref" class="tab-content">
-                <div class="progress-box" style="border-style: solid; border-color: var(--gold);">
-                    <h3 style="margin-top:0; color: var(--gold);">🎁 Thưởng Mời Bạn</h3>
-                    <p style="font-size: 13px; color: #848e9c; margin-bottom: 15px;">Nhận ngay <b>100.000 Xu</b> khi bạn bè tham gia qua link của bạn.</p>
-                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center; font-size: 12px; border-color: #474d57;">
-                    <button class="btn-soft btn-main" style="width: 100%;" onclick="copyLink()">SAO CHÉP LINK</button>
+                <div class="progress-box" style="border-color: var(--gold); border-style: solid;">
+                    <h3 style="color: var(--gold); margin-top:0;">🎁 Mời Bạn Bè</h3>
+                    <p style="font-size: 12px; color: #848e9c;">Nhận 100k Xu mỗi lượt mời thành công.</p>
+                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center;">
+                    <button class="btn-soft btn-main" onclick="copyLink()">SAO CHÉP LINK</button>
                 </div>
             </div>
 
             <div id="bank" class="tab-content">
                 <div class="progress-box">
-                    <small>Tiến trình điều kiện rút (<span id="count-ads">0</span>/5 QC)</small>
+                    <small>Điều kiện rút: <span id="count-ads">0</span>/5 quảng cáo</small>
                     <div class="bar-bg"><div id="bar-fill"></div></div>
                 </div>
 
                 <div class="withdraw-form">
-                    <input type="number" id="w-amount" class="soft-input" placeholder="Số XU muốn rút (Min 300.000)">
-                    
+                    <input type="number" id="w-amount" class="soft-input" placeholder="Số xu (Min 300.000)">
                     <select id="w-method" class="soft-input">
                         <option value="Ngân hàng">Ngân hàng / Ví điện tử</option>
-                        <option value="TON Wallet">Ví TON (Telegram Wallet)</option>
+                        <option value="TON Wallet">Ví TON (Telegram)</option>
                     </select>
-
-                    <textarea id="w-info" class="soft-input" style="height: 100px; resize: none;" placeholder="Nội dung: STK, Tên Ngân hàng, Chủ tài khoản..."></textarea>
-                    
-                    <button class="btn-soft btn-main" style="width: 100%;" onclick="requestWithdraw()">GỬI YÊU CẦU RÚT TIỀN</button>
+                    <textarea id="w-info" class="soft-input" style="height: 80px;" placeholder="STK, Tên Ngân hàng, Chủ tài khoản..."></textarea>
+                    <button class="btn-soft btn-main" onclick="requestWithdraw()">RÚT TIỀN NGAY</button>
                 </div>
             </div>
         </main>
@@ -118,26 +131,26 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        const rawUser = tg.initDataUnsafe.user || { id: 0, first_name: "Khách", username: "guest" };
-        let adController;
-        let userData = {}; // Dữ liệu từ Server
+        const rawUser = tg.initDataUnsafe.user || { id: 0, first_name: "Guest", username: "guest" };
+        
+        // --- CONFIG ADSGRAM IDS ---
+        const ADS_CONFIG = {
+            video: "30955",          // Thay bằng ID thật loại Video
+            interstitial: "int-30961",   // Thay bằng ID thật loại Toàn màn hình
+            banner: "task-30959"          // Thay bằng ID thật loại Banner
+        };
 
         async function init() {
             document.getElementById('u-name').innerText = rawUser.first_name;
-            document.getElementById('u-user').innerText = rawUser.username || "no_user";
-
+            document.getElementById('u-user').innerText = rawUser.username || "n/a";
+            
             try {
                 const config = await (await fetch('/api/config')).json();
-                if (window.Adsgram) {
-                    adController = window.Adsgram.init({ 
-                        blockId: config.blockId,
-                        params: { userId: rawUser.id.toString() } 
-                    });
-                }
                 document.getElementById('ref-link').value = `https://t.me/${config.botUser}/app?startapp=${rawUser.id}`;
-            } catch (e) { console.error("Config error", e); }
-            
+            } catch (e) {}
+
             updateUI();
+            setupAutoAds(); // Khởi động tự động 5 phút
         }
 
         async function updateUI() {
@@ -145,28 +158,47 @@
                 const res = await fetch('/api/user-status', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        id: rawUser.id, 
-                        first_name: rawUser.first_name, 
-                        username: rawUser.username
-                    })
+                    body: JSON.stringify({ id: rawUser.id, first_name: rawUser.first_name, username: rawUser.username })
                 });
-                userData = await res.json();
+                const userData = await res.json();
                 
-                // --- CẬP NHẬT TRƯỜNG DỮ LIỆU ĐỒNG BỘ ---
-                const coins = userData.totalCoins || 0; // Sử dụng totalCoins từ Model
-                const ads = userData.adsWatchedToday || 0; // Sử dụng adsWatchedToday từ Model
-                
+                const coins = userData.totalCoins || 0;
+                const ads = userData.adsWatchedToday || 0;
+
                 document.getElementById('b-coins').innerText = coins.toLocaleString() + " XU";
                 document.getElementById('b-vnd').innerText = `≈ ${(coins/1000).toLocaleString()} VNĐ`;
                 document.getElementById('s-free').innerText = userData.spinsLeft || 0;
-                
-                document.getElementById('s-ads').innerText = ads;
                 document.getElementById('count-ads').innerText = ads;
                 
                 const progress = Math.min((ads / 5) * 100, 100);
                 document.getElementById('bar-fill').style.width = progress + '%';
-            } catch (e) { console.error("Update UI error", e); }
+            } catch (e) {}
+        }
+
+        // HÀM CHẠY QUẢNG CÁO THEO LOẠI
+        function triggerAd(type) {
+            const blockId = ADS_CONFIG[type];
+            if (!window.Adsgram) return;
+
+            const AdController = window.Adsgram.init({ 
+                blockId: blockId, 
+                params: { userId: rawUser.id.toString() } 
+            });
+
+            AdController.show().then(() => {
+                tg.showAlert(`✅ Đã xem xong ${type}! Vui lòng chờ cộng xu...`);
+                setTimeout(updateUI, 2500);
+            }).catch(() => {
+                tg.showAlert("Hết quảng cáo hoặc lỗi tải. Thử lại sau nhé!");
+            });
+        }
+
+        // TỰ ĐỘNG CHẠY INTERSTITIAL MỖI 5 PHÚT
+        function setupAutoAds() {
+            setInterval(() => {
+                console.log("Auto triggering interstitial...");
+                triggerAd('interstitial');
+            }, 5 * 60 * 1000); 
         }
 
         async function claim(type) {
@@ -177,22 +209,9 @@
             });
             const r = await res.json();
             if (r.ok) {
-                tg.showAlert(`🎉 Chúc mừng! Bạn nhận được +${r.lucky.toLocaleString()} xu!`);
-                updateUI(); // Load lại số dư mới từ Server
-            } else tg.showAlert(r.msg || "Có lỗi xảy ra, vui lòng thử lại!");
-        }
-
-        function showAds() {
-            if (!adController) return tg.showAlert("Quảng cáo đang tải, vui lòng đợi...");
-            
-            adController.show().then(() => {
-                tg.showAlert("✅ Cảm ơn bạn! Phần thưởng đang được xử lý...");
-                // Đợi server xử lý callback từ Adsgram rồi cập nhật
-                setTimeout(updateUI, 2500);
-            }).catch((err) => {
-                if (err && err.error === 'no_ads') tg.showAlert("Hiện tại chưa có quảng cáo, hãy thử lại sau ít phút!");
-                else tg.showAlert("Bạn cần xem hết quảng cáo mới có thể nhận quà!");
-            });
+                tg.showAlert(`🎉 +${r.lucky.toLocaleString()} xu!`);
+                updateUI();
+            } else tg.showAlert(r.msg);
         }
 
         async function requestWithdraw() {
@@ -200,21 +219,14 @@
             const info = document.getElementById('w-info').value;
             const method = document.getElementById('w-method').value;
 
-            if(!amount || !info) return tg.showAlert("Vui lòng nhập đầy đủ số tiền và thông tin nhận tiền!");
-
             const res = await fetch('/api/withdraw', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    id: rawUser.id, 
-                    amountXu: parseInt(amount), 
-                    method: method, 
-                    address: info 
-                })
+                body: JSON.stringify({ id: rawUser.id, amountXu: parseInt(amount), method, address: info })
             });
             const r = await res.json();
             if(r.ok) {
-                tg.showAlert("🚀 Gửi yêu cầu rút thành công! Vui lòng chờ quản trị viên duyệt.");
+                tg.showAlert("🚀 Đã gửi yêu cầu! Vui lòng chờ Admin duyệt.");
                 updateUI();
             } else tg.showAlert(r.msg);
         }
