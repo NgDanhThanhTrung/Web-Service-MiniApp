@@ -7,121 +7,21 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        :root {
-            --tg-theme-bg: #f0f2f5;
-            --main-color: #0088cc;
-            --accent-color: #f39c12;
-            --text-color: #222;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--tg-theme-bg);
-            color: var(--text-color);
-            margin: 0;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 400px;
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            box-sizing: border-box;
-        }
-
-        /* Tabs Navigation */
-        .tabs {
-            display: flex;
-            background: #eee;
-            border-radius: 12px;
-            padding: 4px;
-            margin-bottom: 20px;
-        }
-        .tab {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .tab.active {
-            background: #fff;
-            color: var(--main-color);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        /* Balance Display */
-        .balance-section {
-            margin-bottom: 25px;
-        }
-        #balance {
-            font-size: 40px;
-            font-weight: 800;
-            color: var(--accent-color);
-            margin: 5px 0;
-        }
-        .sub-text {
-            color: #888;
-            font-size: 14px;
-        }
-
-        /* Content Sections */
+        /* [Giữ nguyên CSS cũ của bạn ở đây] */
+        :root { --tg-theme-bg: #f0f2f5; --main-color: #0088cc; --accent-color: #f39c12; --text-color: #222; }
+        body { font-family: sans-serif; background-color: var(--tg-theme-bg); padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 400px; background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .tabs { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 20px; }
+        .tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; border-radius: 10px; cursor: pointer; }
+        .tab.active { background: #fff; color: var(--main-color); font-weight: bold; }
         .content { display: none; }
         .content.active { display: block; }
-
-        /* Buttons & Inputs */
-        .btn {
-            background-color: var(--main-color);
-            color: white;
-            border: none;
-            padding: 16px;
-            width: 100%;
-            border-radius: 14px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        .btn:active { transform: scale(0.98); }
-        .btn-withdraw { background-color: var(--accent-color); }
-        .btn-ref { background-color: #28a745; }
-
-        input, select {
-            width: 100%;
-            padding: 14px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            box-sizing: border-box;
-            font-size: 15px;
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-            font-size: 13px;
-        }
-        .info-box {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 10px;
-            border: 1px solid #eee;
-        }
+        .btn { background-color: var(--main-color); color: white; border: none; padding: 16px; width: 100%; border-radius: 14px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #balance { font-size: 40px; font-weight: 800; color: var(--accent-color); margin: 5px 0; text-align: center; }
+        input, select { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; }
     </style>
 </head>
 <body>
-
     <div class="container">
         <div class="tabs">
             <div class="tab active" onclick="switchTab('play')">🎰 Chơi</div>
@@ -129,32 +29,108 @@
             <div class="tab" onclick="switchTab('bank')">🏦 Rút tiền</div>
         </div>
 
-        <div class="balance-section">
-            <div class="sub-text">Số dư của bạn</div>
-            <div id="balance">0 🪙</div>
-            <div id="vnd-value" class="sub-text">≈ 0 VNĐ</div>
-        </div>
+        <div id="balance">0 🪙</div>
 
         <div id="play" class="content active">
-            <div class="info-grid">
-                <div class="info-box">Lượt Free: <b id="spins">0</b></div>
-                <div class="info-box">QC hôm nay: <b id="ads">0/15</b></div>
-            </div>
+            <p>Lượt Free: <b id="spins">0</b> | QC: <b id="ads">0/15</b></p>
             <button class="btn" onclick="handleAction()">BẮT ĐẦU NHẬN XU</button>
-            <p class="sub-text" style="margin-top:15px">Hết lượt Free? Xem quảng cáo để nhận thêm lượt quay!</p>
         </div>
 
         <div id="ref" class="content">
-            <p style="font-weight: bold;">Mời bạn bè - Nhận 10.000 xu</p>
-            <p class="sub-text">Người được mời nhận thêm 2 lượt quay free.</p>
+            <p>Mời bạn bè nhận 10.000 xu!</p>
             <input type="text" id="ref-url" readonly onclick="this.select()">
-            <button class="btn btn-ref" onclick="shareRef()">GỬI LINK MỜI</button>
+            <button class="btn" style="background:#28a745" onclick="shareRef()">GỬI LINK MỜI</button>
         </div>
 
         <div id="bank" class="content">
             <select id="w-method">
-                <option value="Momo">Ví Momo</option>
-                <option value="ATM">Ngân hàng (STK)</option>
-                <option value="TheCao">Thẻ cào điện thoại</option>
+                <option value="Momo">Momo</option>
+                <option value="ATM">Ngân hàng</option>
             </select>
-            <input type="number" id="w-amount" placeholder="Số
+            <input type="number" id="w-amount" placeholder="Số tiền VNĐ">
+            <input type="text" id="w-details" placeholder="SĐT hoặc Số tài khoản">
+            <button class="btn" style="background:#f39c12" onclick="processWithdraw()">RÚT TIỀN</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        const userData = tg.initDataUnsafe.user;
+        let AdController;
+        let botName = "";
+
+        async function initApp() {
+            const config = await (await fetch('/api/config')).json();
+            botName = config.botUsername;
+            if (window.Adsgram) AdController = window.Adsgram.init({ blockId: config.adsgramId });
+            loadUserData();
+        }
+
+        async function loadUserData() {
+            if (!userData) return;
+            const res = await fetch('/api/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    telegramId: userData.id.toString(),
+                    username: userData.username || "n/a",
+                    name: userData.first_name,
+                    refId: tg.initDataUnsafe.start_param 
+                })
+            });
+            const data = await res.json();
+            document.getElementById('balance').innerText = data.totalCoins.toLocaleString() + ' 🪙';
+            document.getElementById('spins').innerText = data.spinsLeft;
+            document.getElementById('ads').innerText = data.adsWatchedToday + '/15';
+            document.getElementById('ref-url').value = `https://t.me/${botName}/app?startapp=${userData.id}`;
+        }
+
+        async function handleAction() {
+            if (parseInt(document.getElementById('spins').innerText) > 0) return claim();
+            if (AdController) AdController.show().then(() => claim()).catch(() => tg.showAlert("Xem hết quảng cáo để nhận thưởng!"));
+        }
+
+        async function claim() {
+            const res = await fetch('/api/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId: userData.id.toString() })
+            });
+            const result = await res.json();
+            if (result.success) { tg.showAlert(`+${result.lucky} xu!`); loadUserData(); }
+        }
+
+        async function processWithdraw() {
+            const amount = document.getElementById('w-amount').value;
+            const res = await fetch('/api/withdraw', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    telegramId: userData.id.toString(),
+                    amountVnd: amount,
+                    method: document.getElementById('w-method').value,
+                    details: document.getElementById('w-details').value
+                })
+            });
+            const result = await res.json();
+            if (result.success) { tg.showAlert("Yêu cầu đã gửi!"); loadUserData(); }
+            else tg.showAlert("Số dư không đủ!");
+        }
+
+        function switchTab(t) {
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(c => c.classList.remove('active'));
+            document.getElementById(t).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        function shareRef() {
+            const url = document.getElementById('ref-url').value;
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}`);
+        }
+
+        initApp();
+        tg.expand();
+    </script>
+</body>
+</html>
