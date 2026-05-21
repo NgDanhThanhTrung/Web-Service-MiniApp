@@ -1,19 +1,63 @@
 <!DOCTYPE html>
-<html>
-<head><title>Admin</title><link rel="stylesheet" href="style.css"></head>
-<body style="padding:20px;">
-    <h2>Quản lý người dùng</h2>
-    <input type="password" id="p" placeholder="Mật khẩu Admin">
-    <button onclick="load()">Xem danh sách</button>
-    <table border="1" id="t" style="width:100%; margin-top:20px; color:white;"></table>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel - Tài Khoản B</title>
+    <style>
+        body { font-family: sans-serif; background: #0b0e11; color: white; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; background: #1e2329; }
+        th, td { padding: 12px; border: 1px solid #333; text-align: left; }
+        th { background: #2b3139; color: #f1b90c; }
+        .btn { padding: 5px 10px; cursor: pointer; border: none; border-radius: 4px; }
+        .btn-done { background: #2ebd85; color: white; }
+    </style>
+</head>
+<body>
+    <h1>ADMIN PANEL (Data Trực Tiếp)</h1>
+    <input type="password" id="pass" placeholder="Nhập pass admin">
+    <button onclick="loadData()">TẢI DỮ LIỆU</button>
+
+    <h2>💰 Yêu Cầu Rút Tiền</h2>
+    <table id="withdrawTable"></table>
+
+    <h2>👥 Top 100 Người Dùng</h2>
+    <table id="userTable"></table>
+
     <script>
-        async function load() {
-            const pass = document.getElementById('p').value;
-            const res = await fetch(`/api/admin/users?pass=${pass}`);
+        async function loadData() {
+            const pass = document.getElementById('pass').value;
+            const res = await fetch(`/api/admin/all-data?pass=${pass}`);
             const data = await res.json();
-            let h = '<tr><th>Tên</th><th>Xu</th><th>Mời</th></tr>';
-            data.forEach(u => h += `<tr><td>${u.first_name}</td><td>${u.coins}</td><td>${u.refs}</td></tr>`);
-            document.getElementById('t').innerHTML = h;
+
+            // Render bảng rút tiền
+            let wHtml = '<tr><th>Tên</th><th>Số tiền</th><th>Cổng</th><th>Thông tin</th><th>Trạng thái</th></tr>';
+            data.withdraws.forEach(w => {
+                wHtml += `<tr>
+                    <td>${w.name}</td>
+                    <td>${w.amountVnd.toLocaleString()}đ</td>
+                    <td>${w.method}</td>
+                    <td>${w.address}</td>
+                    <td>${w.status === 'Chờ duyệt' ? `<button class="btn btn-done" onclick="approve('${w._id}')">Duyệt</button>` : w.status}</td>
+                </tr>`;
+            });
+            document.getElementById('withdrawTable').innerHTML = wHtml;
+
+            // Render bảng người dùng
+            let uHtml = '<tr><th>Tên</th><th>Số Xu</th><th>Số Ref</th></tr>';
+            data.users.forEach(u => {
+                uHtml += `<tr><td>${u.first_name}</td><td>${u.coins.toLocaleString()}</td><td>${u.refs}</td></tr>`;
+            });
+            document.getElementById('userTable').innerHTML = uHtml;
+        }
+
+        async function approve(id) {
+            const pass = document.getElementById('pass').value;
+            await fetch('/api/admin/approve-withdraw', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id, pass })
+            });
+            loadData();
         }
     </script>
 </body>
