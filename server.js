@@ -157,35 +157,49 @@ app.post('/api/mining', async (req, res) => {
         }
     } catch (e) { res.json({ ok: false }); }
 });
-// --- API ĐỒNG BỘ XU MỖI PHÚT ---
-app.post('/api/sync-mining', async (req, res) => {
+// --- API MINING TICK (Ghi trực tiếp vào DB mỗi giây) ---
+app.post('/api/mining-tick', async (req, res) => {
     const { id } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        if (!user || !user.isMining) return res.json({ ok: false, msg: "Không trong trạng thái đào" });
+        if (!user || !user.isMining) return res.json({ ok: false });
 
-        const now = new Date();
-        // Tính số giây đã trôi qua kể từ lần khởi động hoặc lần đồng bộ cuối
-        const elapsedMs = now - new Date(user.miningStartedAt);
-        const elapsedSeconds = Math.floor(elapsedMs / 1000);
-        
-        // Tính số xu kiếm được trong khoảng thời gian đó
+        // Tính tốc độ theo level (12.0 base + bonus)
         const ratePerSecond = 12.0 + ((user.level || 1) - 1) * 0.2;
-        const earned = Math.floor(elapsedSeconds * ratePerSecond);
         
-        // Cập nhật số dư và mốc thời gian mới
-        user.totalCoins += earned;
-        user.miningStartedAt = now; 
-        await user.save();
+        // Cộng trực tiếp vào tổng xu
+        user.totalCoins += ratePerSecond;
+        await user.save(); // Ghi thẳng vào MongoDB
 
-        res.json({ 
-            ok: true, 
-            newTotal: user.totalCoins, 
-            earned: earned 
-        });
+        res.json({ ok: true, currentTotal: Math.floor(user.totalCoins) });
     } catch (e) { 
-        res.json({ ok: false, msg: "Lỗi đồng bộ" }); 
+        res.json({ ok: false }); 
     }
+});
+
+// --- CẬP NHẬT LẠI API MINING START/CLAIM ---
+app.post('/api/mining', async (req, res) => {
+    const { id, action } = req.body;
+    try {
+        const user = await User.findOne({ telegramId: id.toString() });
+        if (!user) return res.json({ ok: false, msg: "Lỗi người dùng" });
+
+        if (action === 'start') {
+            if (user.isMining) return res.json({ ok: false, msg: "Máy đang đào rồi!" });
+            user.isMining = true;
+            user.miningStartedAt = new Date();
+            await user.save();
+            return res.json({ ok: true });
+        }
+
+        if (action === 'claim') {
+            // Sau khi đã chạy tick mỗi giây, nút claim có thể dùng để reset trạng thái
+            user.isMining = false;
+            user.miningStartedAt = null;
+            await user.save();
+            return res.json({ ok: true, coins: Math.floor(user.totalCoins) });
+        }
+    } catch (e) { res.json({ ok: false }); }
 });
 // --- NÂNG CẤP & THƯỞNG CỘT MỐC ---
 app.post('/api/upgrade', async (req, res) => {
