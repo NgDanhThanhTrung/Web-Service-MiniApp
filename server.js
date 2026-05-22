@@ -38,72 +38,62 @@ app.get('/api/config', (req, res) => {
     res.json({ botUser: BOT_USERNAME || 'YourBotUsername' });
 });
 
-// --- HÀM XỬ LÝ PHẦN THƯỞNG (FIX LỖI CỘNG XU) ---
+// --- HÀM XỬ LÝ PHẦN THƯỞNG DÙNG CHUNG ---
 async function processAdReward(userId, type, amount) {
     if (!userId) return { ok: false, msg: 'Missing userId' };
     
-    // Tìm user theo Telegram ID
     const user = await User.findOne({ telegramId: userId.toString() });
     if (!user) return { ok: false, msg: 'User not found' };
 
     const now = new Date();
     const today = now.toDateString();
 
-    // 1. Reset giới hạn ngày mới
+    // Reset ngày mới nếu callback chạy trước khi user mở app
     if (user.lastActiveDay !== today) {
         user.dailyVideo = 0;
         user.dailyInterstitial = 0;
         user.dailyBanner = 0;
         user.adsWatchedToday = 0; 
         user.lastActiveDay = today;
+        user.spinsLeft = (user.spinsLeft || 0) + 1; // Thưởng 1 lượt ngày mới
     }
 
-    // Mapping key
     const limitKey = `daily${type.charAt(0).toUpperCase() + type.slice(1)}`; 
     const cooldownKey = `last${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
-    // 2. Kiểm tra giới hạn (10 lượt/loại/ngày)
-    if (user[limitKey] >= 10) return { ok: false, msg: 'Daily limit reached' };
-
-    // 3. Kiểm tra Cooldown (5 giây)
+    if (user[limitKey] >= 15) return { ok: false, msg: 'Daily limit reached' };
     if (user[cooldownKey] && (now - user[cooldownKey]) / 1000 < 5) {
         return { ok: false, msg: 'Cooldown active' };
     }
 
-    // 4. CẬP NHẬT DỮ LIỆU
     user.totalCoins = (user.totalCoins || 0) + amount;
     user[limitKey] = (user[limitKey] || 0) + 1;
     user[cooldownKey] = now;
-    
-    // Tăng tổng lượt click để đủ điều kiện rút tiền (Điều kiện 5 lượt)
     user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
 
     await user.save();
-    console.log(`✅ [${type.toUpperCase()}] +${amount} xu cho ${userId}. Tổng: ${user.totalCoins}`);
+    console.log(`✅ [${type.toUpperCase()}] +${amount} xu cho ${userId}`);
     return { ok: true };
 }
 
-// --- API CALLBACK ADSGRAM (ĐỊA CHỈ TRÊN DASHBOARD) ---
+// --- API CALLBACK ADSGRAM ---
 
-// 1. Video (75k) - Đã đổi tên route theo yêu cầu của bạn
 app.get('/api/ads-rewarded', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'video', 75000);
     res.send(result.ok ? 'OK' : result.msg);
 });
 
-// 2. Interstitial (50k)
 app.get('/api/ads-interstitial', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'interstitial', 50000);
     res.send(result.ok ? 'OK' : result.msg);
 });
 
-// 3. Banner (25k)
 app.get('/api/ads-banner', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'banner', 25000);
     res.send(result.ok ? 'OK' : result.msg);
 });
 
-// --- API USER STATUS ---
+// --- API USER STATUS (LOGIC LƯỢT QUAY) ---
 app.post('/api/user-status', async (req, res) => {
     const { id, first_name, username } = req.body;
     if (!id) return res.status(400).send("Missing ID");
@@ -113,6 +103,7 @@ app.post('/api/user-status', async (req, res) => {
         const today = new Date().toDateString();
 
         if (!user) {
+            // TÀI KHOẢN MỚI: Tặng 5 lượt quay
             user = new User({ 
                 telegramId: id.toString(), 
                 name: first_name, 
@@ -125,7 +116,8 @@ app.post('/api/user-status', async (req, res) => {
             });
             await user.save();
         } else if (user.lastActiveDay !== today) {
-            user.spinsLeft = 5;
+            // QUA NGÀY MỚI: Chỉ tặng 1 lượt quay
+            user.spinsLeft = (user.spinsLeft || 0) + 1; 
             user.adsWatchedToday = 0;
             user.dailyVideo = 0;
             user.dailyInterstitial = 0;
@@ -139,7 +131,8 @@ app.post('/api/user-status', async (req, res) => {
             id: user.telegramId,
             coins: user.totalCoins,
             first_name: user.name,
-            adsWatched: user.adsWatchedToday
+            adsWatched: user.adsWatchedToday,
+            spinsLeft: user.spinsLeft
         });
     } catch (e) { res.status(500).json(e); }
 });
@@ -169,13 +162,14 @@ app.post('/api/withdraw', async (req, res) => {
     } catch (e) { res.json({ ok: false }); }
 });
 
-// --- CÁC API KHÁC (SPIN, ADMIN) ---
+// --- QUAY THƯỞNG ---
 app.post('/api/action', async (req, res) => {
     const { id, action } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
         if (action === 'spin' && user) {
             if (user.spinsLeft <= 0) return res.json({ ok: false, msg: "Hết lượt quay!" });
+            
             const lucky = Math.floor(Math.random() * 49501) + 500;
             user.totalCoins += lucky;
             user.spinsLeft -= 1;
@@ -186,7 +180,7 @@ app.post('/api/action', async (req, res) => {
     } catch (e) { res.json({ ok: false }); }
 });
 
-// Admin All Data
+// --- ADMIN ---
 app.get('/api/admin/all-data', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.sendStatus(403);
     try {
