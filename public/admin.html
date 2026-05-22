@@ -3,150 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Control - Hệ Thống Đào Xu x100</title>
+    <title>Admin Control - Siêu Cấp Mining</title>
     <style>
         :root { --bg: #0b0e11; --card: #1e2329; --gold: #f1b90c; --green: #2ebd85; --blue: #3b82f6; --text: #eaecef; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
         h1, h2 { color: var(--gold); border-bottom: 1px solid #333; padding-bottom: 10px; }
         
-        .header-tools { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; display: flex; gap: 10px; align-items: center; }
-        input[type="password"] { padding: 12px; border-radius: 8px; border: 1px solid #444; background: #2b3139; color: white; width: 250px; outline: none; }
+        .header-tools { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        input { padding: 12px; border-radius: 8px; border: 1px solid #444; background: #2b3139; color: white; outline: none; }
         button { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn-load { background: var(--gold); color: black; }
-        .btn-load:hover { background: #d9a50b; }
-
+        
+        .stats-bar { display: flex; gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: var(--card); padding: 15px; border-radius: 10px; border: 1px solid #333; flex: 1; }
+        
         table { width: 100%; border-collapse: collapse; margin-bottom: 40px; background: var(--card); font-size: 13px; border-radius: 10px; overflow: hidden; }
         th, td { padding: 12px; border: 1px solid #333; text-align: left; }
-        th { background: #2b3139; color: var(--gold); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
-        tr:hover { background: rgba(255,255,255,0.02); }
-
-        .btn-done { background: var(--green); color: white; font-size: 11px; padding: 8px 12px; }
-        .status-ok { color: var(--green); font-weight: bold; font-size: 12px; }
-        .info-cell { max-width: 250px; word-wrap: break-word; font-size: 12px; color: #848e9c; line-height: 1.4; }
-        .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px; }
-        .badge-level { background: var(--blue); color: white; }
-        .badge-mining { background: var(--green); color: black; animation: blink 1s infinite; }
+        th { background: #2b3139; color: var(--gold); }
         
-        @keyframes blink { 50% { opacity: 0.5; } }
-        @media (max-width: 768px) { table { display: block; overflow-x: auto; } }
+        .btn-done { background: var(--green); color: white; font-size: 11px; padding: 8px 12px; cursor: pointer; }
+        .info-cell { max-width: 250px; font-size: 12px; color: #848e9c; }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        .badge-mining { background: var(--green); color: black; }
     </style>
 </head>
 <body>
-    <h1>⛏️ MINING ADMIN CONTROL CENTER</h1>
+    <h1>⛏️ QUẢN TRỊ VIÊN MINING</h1>
     
     <div class="header-tools">
-        <input type="password" id="pass" placeholder="Nhập mã bảo mật Admin">
-        <button class="btn-load" onclick="loadData()">🔄 TẢI DỮ LIỆU ĐỒNG BỘ</button>
+        <input type="password" id="pass" placeholder="Mật khẩu Admin">
+        <input type="text" id="search" placeholder="Tìm tên hoặc ID..." onkeyup="filterUsers()">
+        <button class="btn-load" onclick="loadData()">🔄 TẢI/LÀM MỚI</button>
     </div>
 
-    <h2>💰 YÊU CẦU RÚT TIỀN (MIN 4.000.000 XU)</h2>
-    <table id="withdrawTable">
-        <tr><td colspan="6" style="text-align:center; padding: 40px;">Vui lòng nhập mật khẩu và ấn tải dữ liệu</td></tr>
-    </table>
+    <div class="stats-bar" id="stats"></div>
 
-    <h2>👥 DANH SÁCH THỢ ĐÀO (TOP 100)</h2>
+    <h2>💰 YÊU CẦU RÚT TIỀN</h2>
+    <table id="withdrawTable"></table>
+
+    <h2>👥 DANH SÁCH THỢ ĐÀO</h2>
     <table id="userTable"></table>
 
     <script>
+        let allUsers = [];
+
         async function loadData() {
             const pass = document.getElementById('pass').value;
             if(!pass) return alert("Vui lòng nhập mật khẩu!");
 
             try {
                 const res = await fetch(`/api/admin/all-data?pass=${pass}`);
-                if(!res.ok) throw new Error("Mật khẩu không chính xác hoặc lỗi Server!");
                 const data = await res.json();
+                allUsers = data.users;
 
-                // 1. Render bảng rút tiền
-                let wHtml = `<tr>
-                    <th>Thời gian</th>
-                    <th>Người dùng</th>
-                    <th>Số Xu Rút</th>
-                    <th>Quy đổi (VNĐ)</th>
-                    <th>Cổng thanh toán & Thông tin</th>
-                    <th>Trạng thái</th>
-                </tr>`;
+                // Render Stats
+                document.getElementById('stats').innerHTML = `
+                    <div class="stat-card">Tổng người dùng: <b>${data.users.length}</b></div>
+                    <div class="stat-card">Tổng xu hệ thống: <b>${data.users.reduce((a,b)=>a+(b.totalCoins||0),0).toLocaleString()}</b></div>
+                `;
 
-                if(data.withdraws.length === 0) wHtml += `<tr><td colspan="6" style="text-align:center;">Chưa có yêu cầu nào</td></tr>`;
-
+                // Render Withdraws
+                let wHtml = `<tr><th>Thời gian</th><th>Người dùng</th><th>Số Xu</th><th>Thông tin</th><th>Trạng thái</th></tr>`;
                 data.withdraws.forEach(w => {
-                    const date = new Date(w.createdAt).toLocaleString('vi-VN');
-                    const isPending = w.status === 'Chờ duyệt';
-                    const vndValue = Math.floor(w.amountXu / 2000); // Tỉ giá 2000:1
-
                     wHtml += `<tr>
-                        <td>${date}</td>
-                        <td><b>${w.name}</b><br><small style="color:#666">ID: ${w.userId}</small></td>
-                        <td style="color:var(--gold); font-weight:bold;">${w.amountXu.toLocaleString()} XU</td>
-                        <td style="color:var(--green);">≈ ${vndValue.toLocaleString()}đ</td>
-                        <td class="info-cell"><b>${w.method}</b><br>${w.address}</td>
-                        <td>
-                            ${isPending ? 
-                                `<button class="btn-done" onclick="approve('${w._id}')">XÁC NHẬN CHUYỂN TIỀN</button>` : 
-                                `<span class="status-ok">✅ ĐÃ HOÀN TẤT</span>`
-                            }
-                        </td>
+                        <td>${new Date(w.createdAt).toLocaleDateString()}</td>
+                        <td><b>${w.name}</b></td>
+                        <td style="color:var(--gold)">${w.amountXu.toLocaleString()}</td>
+                        <td class="info-cell">${w.method}: ${w.address}</td>
+                        <td>${w.status === 'Chờ duyệt' ? `<button class="btn-done" onclick="approve('${w._id}')">DUYỆT</button>` : '✅'}</td>
                     </tr>`;
                 });
                 document.getElementById('withdrawTable').innerHTML = wHtml;
 
-                // 2. Render bảng người dùng
-                let uHtml = `<tr>
-                    <th>Hạng</th>
-                    <th>Thợ Đào (@username)</th>
-                    <th>Số dư (XU)</th>
-                    <th>💎 Kim cương</th>
-                    <th>QC Hôm Nay</th>
-                    <th>Trạng thái máy</th>
-                    <th>ID Telegram</th>
+                renderUserTable(allUsers);
+            } catch (e) { alert("Lỗi kết nối hoặc sai mật khẩu!"); }
+        }
+
+        function renderUserTable(users) {
+            let uHtml = `<tr><th>Hạng</th><th>Tên (@username)</th><th>Số dư</th><th>QC Hôm nay</th><th>Trạng thái</th></tr>`;
+            users.forEach((u, i) => {
+                uHtml += `<tr>
+                    <td>${i+1}</td>
+                    <td><b>${u.name}</b><br><small>@${u.username}</small></td>
+                    <td>${(u.totalCoins||0).toLocaleString()}</td>
+                    <td>${u.adsWatchedToday||0}/15</td>
+                    <td>${u.isMining ? '<span class="badge badge-mining">ĐANG ĐÀO</span>' : 'Nghỉ'}</td>
                 </tr>`;
+            });
+            document.getElementById('userTable').innerHTML = uHtml;
+        }
 
-                data.users.forEach((u, index) => {
-                    const isMining = u.isMining ? '<span class="badge badge-mining">ĐANG ĐÀO</span>' : '<small style="color:#444">Nghỉ ngơi</small>';
-                    
-                    uHtml += `<tr>
-                        <td>${index + 1}</td>
-                        <td>
-                            <b>${u.name || 'N/A'}</b> 
-                            <span class="badge badge-level">Lvl ${u.level || 1}</span>
-                            <br><small>@${u.username || 'n/a'}</small>
-                        </td>
-                        <td style="color:var(--gold); font-weight:bold;">${(u.totalCoins || 0).toLocaleString()}</td>
-                        <td style="color:var(--blue);">${(u.diamonds || 0).toLocaleString()}</td>
-                        <td style="${u.adsWatchedToday >= 15 ? 'color:var(--green)' : 'color:#848e9c'}">
-                            <b>${u.adsWatchedToday || 0}/15</b>
-                        </td>
-                        <td>${isMining}</td>
-                        <td style="color:#666; font-family: monospace;">${u.telegramId}</td>
-                    </tr>`;
-                });
-                document.getElementById('userTable').innerHTML = uHtml;
-
-            } catch (err) {
-                alert(err.message);
-            }
+        function filterUsers() {
+            const query = document.getElementById('search').value.toLowerCase();
+            const filtered = allUsers.filter(u => u.name?.toLowerCase().includes(query) || u.telegramId?.includes(query));
+            renderUserTable(filtered);
         }
 
         async function approve(id) {
-            if(!confirm("Xác nhận bạn đã chuyển khoản và muốn đóng đơn này?")) return;
-            
+            if(!confirm("Xác nhận đã chuyển tiền?")) return;
             const pass = document.getElementById('pass').value;
-            try {
-                const res = await fetch('/api/admin/approve-withdraw', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ id, pass })
-                });
-                
-                if(res.ok) {
-                    alert("Duyệt thành công!");
-                    loadData();
-                } else {
-                    alert("Lỗi khi duyệt đơn từ phía Server!");
-                }
-            } catch (err) {
-                alert("Không thể kết nối máy chủ!");
-            }
+            await fetch('/api/admin/approve-withdraw', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id, pass })
+            });
+            loadData();
         }
     </script>
 </body>
