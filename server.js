@@ -157,7 +157,36 @@ app.post('/api/mining', async (req, res) => {
         }
     } catch (e) { res.json({ ok: false }); }
 });
+// --- API ĐỒNG BỘ XU MỖI PHÚT ---
+app.post('/api/sync-mining', async (req, res) => {
+    const { id } = req.body;
+    try {
+        const user = await User.findOne({ telegramId: id.toString() });
+        if (!user || !user.isMining) return res.json({ ok: false, msg: "Không trong trạng thái đào" });
 
+        const now = new Date();
+        // Tính số giây đã trôi qua kể từ lần khởi động hoặc lần đồng bộ cuối
+        const elapsedMs = now - new Date(user.miningStartedAt);
+        const elapsedSeconds = Math.floor(elapsedMs / 1000);
+        
+        // Tính số xu kiếm được trong khoảng thời gian đó
+        const ratePerSecond = 12.0 + ((user.level || 1) - 1) * 0.2;
+        const earned = Math.floor(elapsedSeconds * ratePerSecond);
+        
+        // Cập nhật số dư và mốc thời gian mới
+        user.totalCoins += earned;
+        user.miningStartedAt = now; 
+        await user.save();
+
+        res.json({ 
+            ok: true, 
+            newTotal: user.totalCoins, 
+            earned: earned 
+        });
+    } catch (e) { 
+        res.json({ ok: false, msg: "Lỗi đồng bộ" }); 
+    }
+});
 // --- NÂNG CẤP & THƯỞNG CỘT MỐC ---
 app.post('/api/upgrade', async (req, res) => {
     const { id } = req.body;
