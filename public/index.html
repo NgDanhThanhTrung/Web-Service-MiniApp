@@ -121,14 +121,31 @@
 
         const rawUser = tg.initDataUnsafe.user || { id: 12345678, first_name: "Guest" };
         let userData = {};
+        let displayCoins = 0; 
 
-        const ADS_CONFIG = { video: "30955", interstitial: "int-30961", banner: "Task-30959" };
+        const ADS_CONFIG = { video: "30955", interstitial: "int-30961", banner: "task-30959" };
 
         async function init() {
             document.getElementById('u-name').innerText = rawUser.first_name;
-            const botUser = "Super_KiemXu_Bot"; 
+            const botUser = "MiniApp_NgDanhThanhTrung_Bot"; 
             document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
-            updateUI();
+            
+            await updateUI();
+            
+            // 1. Tự động cộng xu vào hiển thị mỗi giây (ảo)
+            setInterval(() => {
+                if (userData.isMining) {
+                    // Tốc độ mặc định 12 xu/s, có thể điều chỉnh theo level
+                    const ratePerSecond = 12.0 + ((userData.level || 1) - 1) * 0.2;
+                    displayCoins += ratePerSecond;
+                    document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
+                }
+            }, 1000);
+
+            // 2. Đồng bộ thật với Server mỗi 60 giây
+            setInterval(syncCoinsWithServer, 60000);
+            
+            // 3. Update timer mỗi giây
             setInterval(updateMiningTimer, 1000);
         }
 
@@ -141,8 +158,9 @@
                 });
                 userData = await res.json();
                 
-                document.getElementById('b-coins').innerText = (userData.totalCoins || 0).toLocaleString() + " XU";
-                document.getElementById('b-vnd').innerText = `≈ ${Math.floor((userData.totalCoins || 0) / 2000).toLocaleString()} VNĐ`;
+                displayCoins = userData.totalCoins || 0;
+                document.getElementById('b-coins').innerText = displayCoins.toLocaleString() + " XU";
+                document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 2000).toLocaleString()} VNĐ`;
                 document.getElementById('u-level').innerText = userData.level || 1;
                 document.getElementById('u-diamonds').innerText = (userData.diamonds || 0).toLocaleString();
                 document.getElementById('mining-rate').innerText = (250000 + (userData.level - 1) * 100000).toLocaleString();
@@ -155,8 +173,24 @@
             } catch (e) { console.error(e); }
         }
 
+        async function syncCoinsWithServer() {
+            if (!userData.isMining) return;
+            try {
+                const res = await fetch('/api/sync-mining', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: rawUser.id })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    displayCoins = data.newTotal; // Cập nhật lại chuẩn xác theo server
+                    document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
+                }
+            } catch (e) { console.error("Lỗi đồng bộ:", e); }
+        }
+
         function updateMiningTimer() {
-            if (!userData.miningStatus) {
+            if (!userData.isMining) {
                 const btn = document.getElementById('btn-mining');
                 btn.innerText = "BẮT ĐẦU ĐÀO (6H)";
                 btn.disabled = false;
@@ -165,7 +199,7 @@
                 return;
             }
 
-            const diff = new Date().getTime() - new Date(userData.miningTime).getTime();
+            const diff = new Date().getTime() - new Date(userData.miningStartedAt).getTime();
             const SIX_HOURS = 6 * 60 * 60 * 1000;
 
             if (diff >= SIX_HOURS) {
