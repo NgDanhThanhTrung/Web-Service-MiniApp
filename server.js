@@ -37,7 +37,7 @@ app.get('/api/config', (req, res) => {
     res.json({ botUser: BOT_USERNAME || 'YourBotUsername' });
 });
 
-// --- HÀM XỬ LÝ PHẦN THƯỞNG DÙNG CHUNG (Tỉ giá 2000:1, XU x100) ---
+// --- HÀM XỬ LÝ PHẦN THƯỞNG DÙNG CHUNG ---
 async function processAdReward(userId, type, amount) {
     if (!userId) return { ok: false, msg: 'Missing userId' };
     
@@ -47,7 +47,6 @@ async function processAdReward(userId, type, amount) {
     const now = new Date();
     const today = now.toDateString();
 
-    // Reset daily stats
     if (user.lastActiveDay !== today) {
         user.dailyVideo = 0;
         user.dailyInterstitial = 0;
@@ -61,7 +60,6 @@ async function processAdReward(userId, type, amount) {
 
     if (user[limitKey] >= 15) return { ok: false, msg: 'Hôm nay bạn đã xem hết lượt!' };
     
-    // Cooldown 5 giây chống spam
     if (user[cooldownKey] && (now - user[cooldownKey]) / 1000 < 5) {
         return { ok: false, msg: 'Thao tác quá nhanh!' };
     }
@@ -75,23 +73,23 @@ async function processAdReward(userId, type, amount) {
     return { ok: true };
 }
 
-// --- API CALLBACK ADSGRAM (Thưởng đã giảm 4 lần) ---
+// --- API CALLBACK ADSGRAM ---
 app.get('/api/ads-rewarded', async (req, res) => {
-    const result = await processAdReward(req.query.userId, 'video', 250000); // 125đ
+    const result = await processAdReward(req.query.userId, 'video', 250000);
     res.send(result.ok ? 'OK' : result.msg);
 });
 
 app.get('/api/ads-interstitial', async (req, res) => {
-    const result = await processAdReward(req.query.userId, 'interstitial', 100000); // 50đ
+    const result = await processAdReward(req.query.userId, 'interstitial', 100000);
     res.send(result.ok ? 'OK' : result.msg);
 });
 
 app.get('/api/ads-banner', async (req, res) => {
-    const result = await processAdReward(req.query.userId, 'banner', 25000); // 12.5đ
+    const result = await processAdReward(req.query.userId, 'banner', 25000);
     res.send(result.ok ? 'OK' : result.msg);
 });
 
-// --- API USER STATUS (LOGIC MÁY ĐÀO) ---
+// --- API USER STATUS ---
 app.post('/api/user-status', async (req, res) => {
     const { id, first_name, username } = req.body;
     if (!id) return res.status(400).send("Missing ID");
@@ -102,21 +100,13 @@ app.post('/api/user-status', async (req, res) => {
 
         if (!user) {
             user = new User({ 
-                telegramId: id.toString(), 
-                name: first_name, 
-                username: username || 'n/a', 
-                lastActiveDay: today,
-                level: 1,
-                totalCoins: 0,
-                diamonds: 0
+                telegramId: id.toString(), name: first_name, username: username || 'n/a', 
+                lastActiveDay: today, level: 1, totalCoins: 0, diamonds: 0 
             });
             await user.save();
         } else if (user.lastActiveDay !== today) {
-            user.adsWatchedToday = 0;
-            user.dailyVideo = 0;
-            user.dailyInterstitial = 0;
-            user.dailyBanner = 0;
-            user.lastActiveDay = today;
+            user.adsWatchedToday = 0; user.dailyVideo = 0; user.dailyInterstitial = 0;
+            user.dailyBanner = 0; user.lastActiveDay = today;
             await user.save();
         }
 
@@ -131,14 +121,14 @@ app.post('/api/user-status', async (req, res) => {
     } catch (e) { res.status(500).json(e); }
 });
 
-// --- API MINING TỰ ĐỘNG 6H ---
+// --- API MINING TỰ ĐỘNG (Cập nhật logic tốc độ giây) ---
 app.post('/api/mining', async (req, res) => {
     const { id, action } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
         if (!user) return res.json({ ok: false, msg: "Lỗi người dùng" });
 
-        const SIX_HOURS = 6 * 60 * 60 * 1000;
+        const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
         const now = new Date();
 
         if (action === 'start') {
@@ -152,10 +142,13 @@ app.post('/api/mining', async (req, res) => {
         if (action === 'claim') {
             if (!user.isMining) return res.json({ ok: false, msg: "Máy chưa chạy" });
             const elapsed = now - new Date(user.miningStartedAt);
-            if (elapsed < SIX_HOURS) return res.json({ ok: false, msg: "Chưa đủ 6 tiếng!" });
+            if (elapsed < SIX_HOURS_MS) return res.json({ ok: false, msg: "Chưa đủ 6 tiếng!" });
 
-            // Thưởng Lvl 1: 250k. Mỗi cấp tăng 100k
-            const reward = 250000 + (user.level - 1) * 100000;
+            // LOGIC MỚI: 12 Xu/s base + 0.2 Xu/s mỗi cấp
+            const ratePerSecond = 12.0 + ((user.level || 1) - 1) * 0.2;
+            const totalSeconds = 21600; // 6 giờ
+            const reward = Math.floor(ratePerSecond * totalSeconds);
+            
             user.totalCoins += reward;
             user.isMining = false;
             user.miningStartedAt = null;
@@ -165,12 +158,11 @@ app.post('/api/mining', async (req, res) => {
     } catch (e) { res.json({ ok: false }); }
 });
 
-// --- NÂNG CẤP & THƯỞNG CỘT MỐC (10, 20, 30) ---
+// --- NÂNG CẤP & THƯỞNG CỘT MỐC ---
 app.post('/api/upgrade', async (req, res) => {
     const { id } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        // Chi phí nâng cấp bằng Diamond
         const cost = 1000 + (user.level - 1) * 500; 
 
         if (user.diamonds < cost) return res.json({ ok: false, msg: `Cần ${cost} 💎` });
@@ -180,7 +172,7 @@ app.post('/api/upgrade', async (req, res) => {
 
         let bonusMsg = "";
         if ([10, 20, 30].includes(user.level)) {
-            user.totalCoins += 250000; // Thưởng 250k Xu khi đạt mốc
+            user.totalCoins += 250000;
             bonusMsg = " + Thưởng 250,000 Xu!";
         }
 
@@ -189,7 +181,7 @@ app.post('/api/upgrade', async (req, res) => {
     } catch (e) { res.json({ ok: false }); }
 });
 
-// --- RÚT TIỀN (MIN 4 TRIỆU XU & 15 ADS) ---
+// --- RÚT TIỀN ---
 app.post('/api/withdraw', async (req, res) => {
     const { id, amountXu, method, address } = req.body;
     try {
@@ -200,16 +192,14 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ ok: false, msg: `Cần xem đủ 15 QC hôm nay (${user.adsWatchedToday}/15)` });
         }
 
-        const MIN_WITHDRAW = 4000000; // 4 Triệu Xu = 2.000 VNĐ
+        const MIN_WITHDRAW = 4000000;
         if (amountXu < MIN_WITHDRAW) return res.json({ ok: false, msg: "Tối thiểu 4.000.000 Xu" });
         if (user.totalCoins < amountXu) return res.json({ ok: false, msg: "Số dư không đủ" });
 
         user.totalCoins -= amountXu;
         await user.save();
 
-        const newRequest = new Withdraw({ 
-            userId: id.toString(), name: user.name, amountXu, method, address 
-        });
+        const newRequest = new Withdraw({ userId: id.toString(), name: user.name, amountXu, method, address });
         await newRequest.save();
         res.json({ ok: true });
     } catch (e) { res.json({ ok: false }); }
