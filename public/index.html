@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Siêu Cấp Kiếm Xu</title>
+    <title>Siêu Cấp Mining - Kiếm Xu</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; }
+        :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; --green: #0ecb81; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; -webkit-user-select: none; }
         .header { text-align: center; margin-bottom: 20px; }
         .user-info { color: var(--gold); font-size: 14px; margin-bottom: 10px; font-weight: bold; }
@@ -20,6 +20,15 @@
         .task-info h3 { margin: 0; font-size: 15px; color: var(--gold); }
         .task-info p { margin: 3px 0 0; font-size: 11px; color: #848e9c; }
         .task-action { background: var(--blue); color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+        
+        /* Mining UI */
+        .mining-section { background: #161a1e; padding: 15px; border-radius: 20px; margin-bottom: 20px; border: 1px solid var(--gold); text-align: center; }
+        .mining-btn { background: var(--gold); color: black; padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 16px; width: 100%; cursor: pointer; }
+        .mining-btn:disabled { background: #444; color: #888; }
+        .mining-btn.ready { background: var(--green); color: white; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% {box-shadow: 0 0 0 0 rgba(14, 203, 129, 0.4);} 70% {box-shadow: 0 0 0 10px rgba(14, 203, 129, 0);} 100% {box-shadow: 0 0 0 0 rgba(14, 203, 129, 0);} }
+
         .tabs { display: flex; gap: 8px; background: var(--card); padding: 10px 15px; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; border-top: 1px solid #333; padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px)); }
         .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 20px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 13px; }
         .tab-btn.active { background: #2b3139; color: var(--gold); font-weight: bold; }
@@ -30,51 +39,45 @@
         .progress-box { background: var(--card); padding: 15px; border-radius: 20px; margin-bottom: 15px; text-align: center; border: 1px dashed #444; }
         .bar-bg { width: 100%; height: 10px; background: #000; border-radius: 10px; margin-top: 10px; overflow: hidden; }
         #bar-fill { width: 0%; height: 100%; background: var(--gold); transition: 1s cubic-bezier(0.4, 0, 0.2, 1); }
-        .btn-soft { padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; width: 100%; }
-        .btn-main { background: var(--gold); color: black; }
+        .btn-main { background: var(--gold); color: black; padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 15px; width: 100%; }
     </style>
 </head>
 <body>
     <div id="app">
         <header class="header">
-            <div class="user-info">👤 <span id="u-name">...</span> (@<span id="u-user">...</span>)</div>
+            <div class="user-info">👤 <span id="u-name">...</span> (Lvl <span id="u-level">1</span>)</div>
             <div class="balance-card">
-                <small style="color: #848e9c;">TỔNG TÀI SẢN</small>
-                <h1 id="b-coins" style="margin: 5px 0; font-size: 32px;">0 XU</h1>
-                <p id="b-vnd" style="margin: 0; color: var(--gold);">≈ 0 VNĐ</p>
+                <small style="color: #848e9c;">SỐ DƯ HIỆN TẠI</small>
+                <h1 id="b-coins" style="margin: 5px 0; font-size: 30px;">0 XU</h1>
+                <p id="b-vnd" style="margin: 0; color: var(--gold); font-weight: bold;">≈ 0 VNĐ</p>
+                <div style="margin-top: 10px; font-size: 12px; color: #0ecb81;">💎 Kim cương: <span id="u-diamonds">0</span></div>
             </div>
         </header>
 
         <main class="main">
             <div id="play" class="tab-content active">
-                <button class="btn-soft btn-main" onclick="claim('spin')" style="margin-bottom: 20px;">🎡 QUAY THƯỞNG FREE (<span id="s-free">0</span>)</button>
+                <div class="mining-section">
+                    <div id="mining-timer" style="font-size: 12px; color: #848e9c; margin-bottom: 8px;">Máy đào đã sẵn sàng</div>
+                    <button id="btn-mining" class="mining-btn" onclick="handleMining()">BẮT ĐẦU ĐÀO (6H)</button>
+                    <p style="font-size: 10px; color: #555; margin-top: 5px;">Tốc độ: <span id="mining-rate">250,000</span> XU / 6h</p>
+                </div>
 
                 <div class="task-list">
                     <div class="task-card" onclick="triggerAd('video')">
                         <div class="task-icon">🎬</div>
                         <div class="task-info">
-                            <h3>Rewarded Video</h3>
-                            <p>Nhận ngay 75.000 Xu</p>
+                            <h3>Xem Video Rewarded</h3>
+                            <p>Nhận ngay 250.000 Xu (125đ)</p>
                         </div>
                         <div class="task-action">Xem</div>
                     </div>
-
                     <div class="task-card" onclick="triggerAd('interstitial')">
                         <div class="task-icon">🖼️</div>
                         <div class="task-info">
-                            <h3>Interstitial Ad</h3>
-                            <p>Nhận ngay 50.000 Xu</p>
+                            <h3>Mở Quảng Cáo Nhanh</h3>
+                            <p>Nhận ngay 100.000 Xu (50đ)</p>
                         </div>
                         <div class="task-action">Mở</div>
-                    </div>
-
-                    <div class="task-card" onclick="triggerAd('banner')">
-                        <div class="task-icon">🎫</div>
-                        <div class="task-info">
-                            <h3>Static Banner</h3>
-                            <p>Nhận ngay 25.000 Xu</p>
-                        </div>
-                        <div class="task-action">Xem</div>
                     </div>
                 </div>
             </div>
@@ -82,32 +85,33 @@
             <div id="ref" class="tab-content">
                 <div class="progress-box" style="border-color: var(--gold); border-style: solid;">
                     <h3 style="color: var(--gold); margin-top:0;">🎁 Mời Bạn Bè</h3>
-                    <p style="font-size: 12px; color: #848e9c;">Nhận xu thưởng khi bạn bè tham gia.</p>
-                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center;" value="Đang tải link...">
-                    <button class="btn-soft btn-main" onclick="copyLink()">SAO CHÉP LINK</button>
+                    <p style="font-size: 12px; color: #848e9c;">Nhận xu thưởng khi bạn bè tham gia đào.</p>
+                    <input type="text" id="ref-link" class="soft-input" readonly style="text-align: center;">
+                    <button class="btn-main" onclick="copyLink()">SAO CHÉP LINK</button>
                 </div>
             </div>
 
             <div id="bank" class="tab-content">
                 <div class="progress-box">
-                    <small>Điều kiện rút: <span id="count-ads">0</span>/5 quảng cáo hôm nay</small>
+                    <small>Điều kiện: Xem <span id="count-ads">0</span>/15 quảng cáo hôm nay</small>
                     <div class="bar-bg"><div id="bar-fill"></div></div>
                 </div>
 
                 <div class="withdraw-form">
-                    <input type="number" id="w-amount" class="soft-input" placeholder="Số xu (Min 300.000)">
+                    <input type="number" id="w-amount" class="soft-input" placeholder="Số xu rút (Min 4.000.000)">
                     <select id="w-method" class="soft-input">
-                        <option value="Momo / Ngân hàng">Momo / Ngân hàng</option>
-                        <option value="Ví TON">Ví TON (Telegram)</option>
+                        <option value="Momo">Ví Momo</option>
+                        <option value="ATM">Ngân hàng (ATM)</option>
+                        <option value="TON">Ví TON (Telegram)</option>
                     </select>
-                    <textarea id="w-info" class="soft-input" style="height: 80px;" placeholder="STK, Tên Ngân hàng, Chủ tài khoản..."></textarea>
-                    <button class="btn-soft btn-main" onclick="requestWithdraw()">RÚT TIỀN NGAY</button>
+                    <textarea id="w-info" class="soft-input" style="height: 80px;" placeholder="STK, Tên chủ TK, Tên Ngân hàng..."></textarea>
+                    <button class="btn-main" onclick="requestWithdraw()">GỬI YÊU CẦU RÚT TIỀN</button>
                 </div>
             </div>
         </main>
 
         <div class="tabs">
-            <button class="tab-btn active" onclick="openTab(event, 'play')">🎡 KIẾM XU</button>
+            <button class="tab-btn active" onclick="openTab(event, 'play')">⛏️ ĐÀO XU</button>
             <button class="tab-btn" onclick="openTab(event, 'ref')">👥 MỜI BẠN</button>
             <button class="tab-btn" onclick="openTab(event, 'bank')">🏦 RÚT TIỀN</button>
         </div>
@@ -116,34 +120,23 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        tg.ready();
 
-        const rawUser = tg.initDataUnsafe.user || { id: 12345678, first_name: "Guest", username: "guest" };
-        
-        // --- CONFIG ADSGRAM IDS ---
-        const ADS_CONFIG = {
-            video: "30955",
-            interstitial: "int-30961",
-            banner: "Task-30959"
-        };
+        const rawUser = tg.initDataUnsafe.user || { id: 12345678, first_name: "Guest" };
+        let userData = {};
+
+        // Config Adsgram
+        const ADS_CONFIG = { video: "30955", interstitial: "int-30961", banner: "Task-30959" };
 
         async function init() {
             document.getElementById('u-name').innerText = rawUser.first_name;
-            document.getElementById('u-user').innerText = rawUser.username || "n/a";
-            
-            // Lấy Config Bot User từ Server để tạo link Ref
-            try {
-                const configRes = await fetch('/api/config');
-                const config = await configRes.json();
-                const botUser = config.botUser || "Super_KiemXu_Bot";
-                document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
-            } catch (e) {
-                document.getElementById('ref-link').value = `https://t.me/Super_KiemXu_Bot/app?startapp=${rawUser.id}`;
-            }
-
             updateUI();
-            // Tự động chạy Interstitial mỗi 5 phút
-            setInterval(() => { triggerAd('interstitial'); }, 5 * 60 * 1000); 
+            
+            // Tạo link ref
+            const botUser = "Super_KiemXu_Bot"; 
+            document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
+            
+            // Chạy ngầm cập nhật timer mỗi giây
+            setInterval(updateMiningTimer, 1000);
         }
 
         async function updateUI() {
@@ -151,70 +144,88 @@
                 const res = await fetch('/api/user-status', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        id: rawUser.id, 
-                        first_name: rawUser.first_name, 
-                        username: rawUser.username 
-                    })
+                    body: JSON.stringify({ id: rawUser.id, first_name: rawUser.first_name })
                 });
-                const user = await res.json();
+                userData = await res.json();
                 
-                // Cập nhật số dư (Dùng trường 'coins' từ mappedUser của server)
-                const currentCoins = user.coins || 0;
-                document.getElementById('b-coins').innerText = currentCoins.toLocaleString() + " XU";
-                document.getElementById('b-vnd').innerText = `≈ ${(currentCoins / 1000).toLocaleString()} VNĐ`;
+                // Tiền & Tỉ giá 2000:1
+                const coins = userData.totalCoins || 0;
+                document.getElementById('b-coins').innerText = coins.toLocaleString() + " XU";
+                document.getElementById('b-vnd').innerText = `≈ ${Math.floor(coins / 2000).toLocaleString()} VNĐ`;
                 
-                // Cập nhật lượt quay
-                document.getElementById('s-free').innerText = user.spinsLeft || 0;
+                document.getElementById('u-level').innerText = userData.level || 1;
+                document.getElementById('u-diamonds').innerText = (userData.diamonds || 0).toLocaleString();
+                document.getElementById('mining-rate').innerText = (250000 + (userData.level - 1) * 100000).toLocaleString();
                 
-                // Cập nhật tiến trình rút tiền (Dùng 'adsWatched')
-                const ads = user.adsWatched || 0;
+                // Tiến độ rút (15 Ads)
+                const ads = userData.adsWatchedToday || 0;
                 document.getElementById('count-ads').innerText = ads;
-                const progress = Math.min((ads / 5) * 100, 100);
-                document.getElementById('bar-fill').style.width = progress + '%';
-            } catch (e) {
-                console.error("Lỗi cập nhật UI:", e);
+                document.getElementById('bar-fill').style.width = Math.min((ads / 15) * 100, 100) + '%';
+                
+                updateMiningTimer();
+            } catch (e) { console.log(e); }
+        }
+
+        function updateMiningTimer() {
+            const btn = document.getElementById('btn-mining');
+            const statusText = document.getElementById('mining-timer');
+            
+            if (!userData.miningStatus) {
+                btn.innerText = "BẮT ĐẦU ĐÀO (6H)";
+                btn.disabled = false;
+                btn.className = "mining-btn";
+                statusText.innerText = "Máy đào đang chờ lệnh";
+                return;
+            }
+
+            const startTime = new Date(userData.miningTime).getTime();
+            const now = new Date().getTime();
+            const SIX_HOURS = 6 * 60 * 60 * 1000;
+            const diff = now - startTime;
+
+            if (diff >= SIX_HOURS) {
+                btn.innerText = "NHẬN XU NGAY";
+                btn.disabled = false;
+                btn.className = "mining-btn ready";
+                statusText.innerText = "✅ Đã đào xong!";
+            } else {
+                const remaining = SIX_HOURS - diff;
+                const h = Math.floor(remaining / 3600000);
+                const m = Math.floor((remaining % 3600000) / 60000);
+                const s = Math.floor((remaining % 60000) / 1000);
+                btn.innerText = `ĐANG ĐÀO... ${h}h ${m}m ${s}s`;
+                btn.disabled = true;
+                btn.className = "mining-btn";
+                statusText.innerText = "Máy đang hoạt động hết công suất";
+            }
+        }
+
+        async function handleMining() {
+            const action = (document.getElementById('btn-mining').classList.contains('ready')) ? 'claim' : 'start';
+            
+            const res = await fetch('/api/mining', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: rawUser.id, action })
+            });
+            const r = await res.json();
+            
+            if (r.ok) {
+                if (action === 'claim') tg.showAlert(`🎉 Tuyệt vời! Bạn nhận được +${r.reward.toLocaleString()} XU!`);
+                updateUI();
+            } else {
+                tg.showAlert(r.msg);
             }
         }
 
         function triggerAd(type) {
-            const blockId = ADS_CONFIG[type];
             if (!window.Adsgram) return;
-
-            const AdController = window.Adsgram.init({ 
-                blockId: blockId, 
-                params: { userId: rawUser.id.toString() } 
-            });
+            const AdController = window.Adsgram.init({ blockId: ADS_CONFIG[type], params: { userId: rawUser.id.toString() } });
 
             AdController.show().then(() => {
-                tg.showAlert(`✅ Chúc mừng! Đang cộng xu ${type}...`);
-                // Gọi cập nhật UI nhiều lần để đảm bảo MongoDB đã ghi xong dữ liệu từ callback
-                setTimeout(updateUI, 2500); 
-                setTimeout(updateUI, 6000); 
-            }).catch((e) => {
-                tg.showAlert("Quảng cáo chưa hoàn thành hoặc có lỗi xảy ra.");
-            });
-        }
-
-        async function claim(type) {
-            if (type === 'spin') {
-                const res = await fetch('/api/action', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ id: rawUser.id, action: 'spin' })
-                });
-                const r = await res.json();
-                if (r.ok) {
-                    tg.showPopup({
-                        title: 'Kết quả quay',
-                        message: `🎉 Bạn nhận được +${r.lucky.toLocaleString()} xu!`,
-                        buttons: [{type: 'ok'}]
-                    });
-                    updateUI();
-                } else {
-                    tg.showAlert(r.msg);
-                }
-            }
+                tg.showAlert("✅ Đã hoàn thành! Đang cộng xu...");
+                setTimeout(updateUI, 3000);
+            }).catch(() => tg.showAlert("Quảng cáo bị lỗi hoặc chưa xem xong."));
         }
 
         async function requestWithdraw() {
@@ -222,8 +233,8 @@
             const info = document.getElementById('w-info').value;
             const method = document.getElementById('w-method').value;
 
-            if (!amount || amount < 300000) return tg.showAlert("Tối thiểu rút 300.000 xu!");
-            if (!info) return tg.showAlert("Vui lòng nhập thông tin thanh toán!");
+            if (amount < 4000000) return tg.showAlert("Tối thiểu rút là 4.000.000 XU!");
+            if (!info) return tg.showAlert("Vui lòng điền thông tin nhận tiền!");
 
             const res = await fetch('/api/withdraw', {
                 method: 'POST',
@@ -232,11 +243,9 @@
             });
             const r = await res.json();
             if (r.ok) {
-                tg.showAlert("🚀 Gửi yêu cầu thành công! Vui lòng chờ duyệt.");
+                tg.showAlert("🚀 Đã gửi yêu cầu! Admin sẽ duyệt tiền cho bạn sớm.");
                 updateUI();
-            } else {
-                tg.showAlert(r.msg);
-            }
+            } else tg.showAlert(r.msg);
         }
 
         function openTab(evt, name) {
@@ -250,12 +259,10 @@
         function copyLink() {
             const el = document.getElementById('ref-link');
             el.select();
-            el.setSelectionRange(0, 99999);
             document.execCommand('copy');
-            tg.showAlert("📋 Đã sao chép link mời bạn bè!");
+            tg.showAlert("📋 Đã sao chép link mời!");
         }
 
-        // Khởi tạo app
         init();
     </script>
 </body>
