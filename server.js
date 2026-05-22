@@ -120,42 +120,30 @@ app.post('/api/user-status', async (req, res) => {
         });
     } catch (e) { res.status(500).json(e); }
 });
-
-// --- API MINING TỰ ĐỘNG (Cập nhật logic tốc độ giây) ---
-app.post('/api/mining', async (req, res) => {
-    const { id, action } = req.body;
+// --- THÊM API NÀY VÀO ĐÂY ---
+app.post('/api/get-realtime-data', async (req, res) => {
+    const { id } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        if (!user) return res.json({ ok: false, msg: "Lỗi người dùng" });
+        if (!user) return res.json({ ok: false });
 
-        const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-        const now = new Date();
-
-        if (action === 'start') {
-            if (user.isMining) return res.json({ ok: false, msg: "Máy đang đào rồi!" });
-            user.isMining = true;
-            user.miningStartedAt = now;
-            await user.save();
-            return res.json({ ok: true });
+        let currentTotal = user.totalCoins;
+        // Tính toán số xu tạm thời nếu đang đào
+        if (user.isMining && user.miningStartedAt) {
+            const diffSeconds = (new Date() - new Date(user.miningStartedAt)) / 1000;
+            // Dùng miningRate từ DB hoặc mặc định 12.0
+            const rate = user.miningRate || 12.0;
+            currentTotal += (diffSeconds * rate);
         }
 
-        if (action === 'claim') {
-            if (!user.isMining) return res.json({ ok: false, msg: "Máy chưa chạy" });
-            const elapsed = now - new Date(user.miningStartedAt);
-            if (elapsed < SIX_HOURS_MS) return res.json({ ok: false, msg: "Chưa đủ 6 tiếng!" });
-
-            // LOGIC MỚI: 12 Xu/s base + 0.2 Xu/s mỗi cấp
-            const ratePerSecond = 12.0 + ((user.level || 1) - 1) * 0.2;
-            const totalSeconds = 21600; // 6 giờ
-            const reward = Math.floor(ratePerSecond * totalSeconds);
-            
-            user.totalCoins += reward;
-            user.isMining = false;
-            user.miningStartedAt = null;
-            await user.save();
-            return res.json({ ok: true, reward, coins: user.totalCoins });
-        }
-    } catch (e) { res.json({ ok: false }); }
+        res.json({ 
+            ok: true, 
+            totalCoins: Math.floor(currentTotal), 
+            diamonds: user.diamonds 
+        });
+    } catch (e) {
+        res.json({ ok: false });
+    }
 });
 // --- API MINING TICK (Ghi trực tiếp vào DB mỗi giây) ---
 app.post('/api/mining-tick', async (req, res) => {
