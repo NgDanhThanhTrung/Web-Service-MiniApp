@@ -126,29 +126,38 @@
         const ADS_CONFIG = { video: "30955", interstitial: "int-30961", banner: "task-30959" };
 
         async function init() {
-            document.getElementById('u-name').innerText = rawUser.first_name;
-            const botUser = "MiniApp_NgDanhThanhTrung_Bot"; 
-            document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
+        document.getElementById('u-name').innerText = rawUser.first_name;
+        const botUser = "MiniApp_NgDanhThanhTrung_Bot"; 
+        document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
+    
+        // Gọi UI lần đầu
+        await updateUI();
+    
+        // API LẤY DỮ LIỆU THỜI GIAN THỰC TỪ SERVER MỖI GIÂY
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/get-realtime-data', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: rawUser.id })
+                });
+                const data = await res.json();
             
-            await updateUI();
-            
-            // 1. Tự động cộng xu vào hiển thị mỗi giây (ảo)
-            setInterval(() => {
-                if (userData.isMining) {
-                    // Tốc độ mặc định 12 xu/s, có thể điều chỉnh theo level
-                    const ratePerSecond = 12.0 + ((userData.level || 1) - 1) * 0.2;
-                    displayCoins += ratePerSecond;
+                if (data.ok) {
+                    // Cập nhật số dư thực từ DB
+                    displayCoins = data.totalCoins;
                     document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
+                    document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 2000).toLocaleString()} VNĐ`;
+                    document.getElementById('u-diamonds').innerText = (data.diamonds || 0).toLocaleString();
                 }
-            }, 1000);
+            } catch (e) {
+                console.error("Lỗi cập nhật real-time:", e);
+            }
+        }, 1000); 
 
-            // 2. Đồng bộ thật với Server mỗi 60 giây
-            setInterval(syncCoinsWithServer, 60000);
-            
-            // 3. Update timer mỗi giây
-            setInterval(updateMiningTimer, 1000);
-        }
-
+        // Update timer mining mỗi giây (để hiển thị đúng countdown)
+        setInterval(updateMiningTimer, 1000);
+    }
         async function updateUI() {
             try {
                 const res = await fetch('/api/user-status', {
