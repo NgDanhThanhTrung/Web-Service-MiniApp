@@ -5,32 +5,35 @@ const userSchema = new mongoose.Schema({
     username: { type: String, default: 'n/a' },
     name: { type: String, default: 'Người dùng' },
     
-    // --- HỆ THỐNG KINH TẾ (ĐÃ NHÂN 100) ---
-    // Số dư XU: Hiển thị lớn để tạo hưng phấn (100.000.000 XU = 60.000 VNĐ)
+    // --- HỆ THỐNG KINH TẾ (ĐÃ NHÂN 100 & TỈ GIÁ 2000:1) ---
+    // Hiển thị lớn: 4.000.000 XU = 2.000 VNĐ | 100.000.000 XU = 50.000 VNĐ
     totalCoins: { type: Number, default: 0 },
     
-    // Số dư Kim cương: Dùng để nâng cấp máy đào hoặc quy đổi ngược ra XU
+    // Kim cương dùng để nâng cấp máy đào
     diamonds: { type: Number, default: 0 },
     
-    // Cấp độ máy đào: Quyết định tốc độ đào XU tự động mỗi giây
+    // Cấp độ máy đào: Quyết định sản lượng nhận được sau mỗi 6 giờ
     level: { type: Number, default: 1 },
     
+    // --- HỆ THỐNG MÁY ĐÀO TỰ ĐỘNG (6 TIẾNG/LẦN) ---
+    isMining: { type: Boolean, default: false },
+    miningStartedAt: { type: Date, default: null },
+
     // --- QUẢN LÝ QUẢNG CÁO & ĐIỀU KIỆN RÚT TIỀN ---
-    // Tổng số QC đã xem trong ngày (Cộng dồn từ Video + Interstitial + Banner)
+    // Tổng số QC trong ngày (Bắt buộc >= 15 để rút tiền)
     adsWatchedToday: { type: Number, default: 0 },
     
     dailyVideo: { type: Number, default: 0 },
     dailyInterstitial: { type: Number, default: 0 },
     dailyBanner: { type: Number, default: 0 },
 
-    // Ngày hoạt động gần nhất để reset các chỉ số daily (Daily Reset)
+    // Reset daily stats
     lastActiveDay: { type: String, default: new Date().toDateString() },
 
-    // --- CHỐNG SPAM & GIỚI HẠN ---
+    // --- CHỐNG SPAM & COOLDOWN ---
     lastVideo: { type: Date },
     lastInterstitial: { type: Date },
     lastBanner: { type: Date },
-    spinsLeft: { type: Number, default: 5 },
 
     // --- HỆ THỐNG GIỚI THIỆU ---
     refs: { type: Number, default: 0 },
@@ -38,21 +41,22 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 /**
- * Ghi chú vận hành cho Nhà phát triển (Economy Logic):
- * * 1. KHAI THÁC TỰ ĐỘNG:
- * - Tốc độ Lvl 1: 2.0 XU/giây
- * - Mỗi cấp tăng thêm: +1.0 XU/giây
- * - Công thức: Speed = 2.0 + (level - 1) * 1.0
- * * 2. TỶ GIÁ HỐI ĐOÁI (Exchange - Chiết khấu 25%):
+ * GHI CHÚ VẬN HÀNH CHO NHÀ PHÁT TRIỂN (Updated Economy 2.0):
+ * * 1. KHAI THÁC TỰ ĐỘNG (MINING 6H):
+ * - Sản lượng Lvl 1: 250,000 XU / 6 giờ.
+ * - Mỗi cấp tăng thêm: +100,000 XU / 6 giờ.
+ * - Thưởng cột mốc (Milestone): Khi user đạt Level 10, 20, 30 cộng ngay 250,000 XU.
+ * * 2. TỶ GIÁ HỐI ĐOÁI (Exchange):
  * - Chiều MUA: 20,000 XU = 1 💎
  * - Chiều BÁN: 1 💎 = 15,000 XU
- * * 3. GIÁ TRỊ THỰC (Developer Profit):
- * - 100,000,000 XU = 60,000 VNĐ (Tỷ giá an toàn để trả thưởng từ Ads)
- * - 1 XU = 0.0006 VNĐ
- * * 4. LOGIC ADS:
- * - Mỗi khi xem thành công bất kỳ loại QC nào, cập nhật đồng thời:
- * user.daily[Loại_QC] += 1
- * user.adsWatchedToday = user.dailyVideo + user.dailyInterstitial + user.dailyBanner
+ * * 3. GIÁ TRỊ THỰC (Profit calculation):
+ * - Tỉ giá quy đổi: 2,000 XU = 1 VNĐ.
+ * - Min rút: 4,000,000 XU (= 2,000 VNĐ).
+ * - Điều kiện rút: adsWatchedToday >= 15 (Để Admin có lãi từ Adsgram).
+ * * 4. LOGIC QUẢNG CÁO (Đã giảm thưởng 4 lần):
+ * - Video Rewarded: 250,000 XU (= 125 VNĐ)
+ * - Interstitial: 100,000 XU (= 50 VNĐ)
+ * - Banner: 25,000 XU (= 12.5 VNĐ)
  */
 
 module.exports = mongoose.model('User', userSchema);
