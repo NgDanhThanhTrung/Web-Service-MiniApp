@@ -17,6 +17,7 @@
         .task-card:active { transform: scale(0.98); background: #2b3139; }
         .task-icon { font-size: 24px; width: 45px; height: 45px; background: rgba(241,185,12,0.1); display: flex; align-items: center; justify-content: center; border-radius: 12px; }
         .task-info { flex: 1; }
+        .banner-container { width: 100%; min-height: 50px; margin-bottom: 20px; border-radius: 15px; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; }
         .task-info h3 { margin: 0; font-size: 15px; color: var(--gold); }
         .task-info p { margin: 3px 0 0; font-size: 11px; color: #848e9c; }
         .task-action { background: var(--blue); color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; }
@@ -57,6 +58,7 @@
 
         <main class="main">
             <div id="play" class="tab-content active">
+                <div id="banner-ad-box" class="banner-container"></div>
                 <div class="mining-section">
                     <div id="mining-timer" style="font-size: 12px; color: #848e9c; margin-bottom: 8px;">Đang kiểm tra máy đào...</div>
                     <button id="btn-mining" class="mining-btn" onclick="startMining()">BẮT ĐẦU ĐÀO (6H)</button>
@@ -151,11 +153,18 @@
         async function init() {
             document.getElementById('u-name').innerText = rawUser.first_name;
             document.getElementById('ref-link').value = `https://t.me/MiniApp_NgDanhThanhTrung_Bot/app?startapp=${rawUser.id}`;
+    
+    // Gọi hàm load banner
+            loadBanner();
+    
+    // Gọi update UI
             await updateUI();
-            
-            // Cập nhật đếm ngược mỗi giây
+    
+    // Giữ lại hàm cập nhật đồng hồ
             setInterval(updateMiningTimer, 1000);
         }
+
+// XÓA HẾT ĐOẠN ĐỊNH NGHĨA INIT LẦN THỨ 2 Ở CUỐI FILE ĐI
 
         async function updateUI() {
             try {
@@ -316,7 +325,26 @@
             document.execCommand('copy');
             tg.showAlert("📋 Đã sao chép link mời!");
         }
+        function loadBanner() {
+    // Kiểm tra xem Adsgram đã tải xong chưa
+    if (typeof window.Adsgram === 'undefined') {
+        console.log("Adsgram chưa sẵn sàng, chờ 2 giây...");
+        setTimeout(loadBanner, 2000); 
+        return;
+    }
 
+    const banner = window.Adsgram.init({ 
+        blockId: ADS_CONFIG.banner, 
+        params: { userId: rawUser.id.toString() } 
+    });
+    
+    banner.render("banner-ad-box")
+        .then(() => console.log("Banner đã hiển thị thành công"))
+        .catch(e => {
+            console.error("Lỗi hiển thị banner:", e);
+            document.getElementById("banner-ad-box").style.display = "none"; // Ẩn khung nếu lỗi
+        });
+}
         init();
     </script>
 </body>
