@@ -23,10 +23,8 @@
         
         .mining-section { background: #161a1e; padding: 15px; border-radius: 20px; margin-bottom: 20px; border: 1px solid var(--gold); text-align: center; }
         .mining-btn { background: var(--gold); color: black; padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 16px; width: 100%; cursor: pointer; transition: 0.3s; }
-        .mining-btn:disabled { background: #444; color: #888; }
-        .mining-btn.ready { background: var(--green); color: white; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% {box-shadow: 0 0 0 0 rgba(14, 203, 129, 0.4);} 70% {box-shadow: 0 0 0 10px rgba(14, 203, 129, 0);} 100% {box-shadow: 0 0 0 0 rgba(14, 203, 129, 0);} }
-
+        .mining-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+        
         .tabs { display: flex; gap: 8px; background: var(--card); padding: 10px 15px; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; border-top: 1px solid #333; padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px)); }
         .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 20px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 11px; }
         .tab-btn.active { background: #2b3139; color: var(--gold); font-weight: bold; }
@@ -39,7 +37,6 @@
         #bar-fill { width: 0%; height: 100%; background: var(--gold); transition: 1s ease; }
         .btn-main { background: var(--gold); color: black; padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 15px; width: 100%; cursor: pointer; }
 
-        /* Style mới cho Quy đổi */
         .ex-container { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #333; margin-bottom: 15px; }
         .ex-label { font-size: 12px; color: #848e9c; margin-bottom: 10px; display: block; text-align: center; }
         .ex-group { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -61,9 +58,9 @@
         <main class="main">
             <div id="play" class="tab-content active">
                 <div class="mining-section">
-                    <div id="mining-timer" style="font-size: 12px; color: #848e9c; margin-bottom: 8px;">Đang tải...</div>
-                    <button id="btn-mining" class="mining-btn" onclick="handleMining()">KIỂM TRA...</button>
-                    <p style="font-size: 10px; color: #555; margin-top: 5px;">Tốc độ: <span id="mining-rate">250,000</span> XU / 6h</p>
+                    <div id="mining-timer" style="font-size: 12px; color: #848e9c; margin-bottom: 8px;">Đang kiểm tra máy đào...</div>
+                    <button id="btn-mining" class="mining-btn" onclick="startMining()">BẮT ĐẦU ĐÀO (6H)</button>
+                    <p style="font-size: 10px; color: #555; margin-top: 5px;">Thưởng phiên: <span id="mining-rate">...</span> XU</p>
                     
                     <button onclick="upgradeLevel()" style="margin-top: 10px; background: none; border: 1px solid var(--blue); color: var(--blue); padding: 5px 15px; border-radius: 10px; font-size: 11px;">NÂNG CẤP (100 💎)</button>
                 </div>
@@ -73,7 +70,7 @@
                         <div class="task-icon">🎬</div>
                         <div class="task-info">
                             <h3>Xem Video Rewarded</h3>
-                            <p>Nhận ngay 250.000 Xu (125đ)</p>
+                            <p>Nhận ngay 250.000 Xu (12.5đ)</p>
                         </div>
                         <div class="task-action">Xem</div>
                     </div>
@@ -81,7 +78,7 @@
                         <div class="task-icon">🖼️</div>
                         <div class="task-info">
                             <h3>Mở Quảng Cáo Nhanh</h3>
-                            <p>Nhận ngay 100.000 Xu (50đ)</p>
+                            <p>Nhận ngay 100.000 Xu (5đ)</p>
                         </div>
                         <div class="task-action">Mở</div>
                     </div>
@@ -90,7 +87,6 @@
 
             <div id="exchange" class="tab-content">
                 <span class="ex-label">Tỷ giá: Mua 2,000 Xu | Bán 1,500 Xu</span>
-                
                 <div class="ex-container" style="border-color: var(--blue);">
                     <h3 style="margin-top:0; color: var(--blue); font-size: 16px;">🛒 MUA KIM CƯƠNG</h3>
                     <div class="ex-group">
@@ -99,7 +95,6 @@
                     </div>
                     <small style="color: #848e9c;">Giá dự tính: <span id="buy-price" style="color: var(--gold);">0</span> Xu</small>
                 </div>
-
                 <div class="ex-container" style="border-color: var(--green);">
                     <h3 style="margin-top:0; color: var(--green); font-size: 16px;">💰 BÁN KIM CƯƠNG</h3>
                     <div class="ex-group">
@@ -129,7 +124,7 @@
                     <select id="w-method" class="soft-input">
                         <option value="Momo">Ví Momo</option>
                         <option value="ATM">Ngân hàng (ATM)</option>
-                        <option value="TON">Ví TON </option>
+                        <option value="TON">Ví TON</option>
                     </select>
                     <textarea id="w-info" class="soft-input" style="height: 80px;" placeholder="STK, Tên chủ TK, Tên Ngân hàng..."></textarea>
                     <button class="btn-main" onclick="requestWithdraw()">GỬI YÊU CẦU RÚT TIỀN</button>
@@ -148,37 +143,17 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        tg.enableClosingConfirmation();
 
         const rawUser = tg.initDataUnsafe.user || { id: 12345678, first_name: "Guest" };
         let userData = {};
-        let displayCoins = 0; 
-
         const ADS_CONFIG = { video: "30955", interstitial: "int-30961", banner: "task-30959" };
 
         async function init() {
             document.getElementById('u-name').innerText = rawUser.first_name;
-            const botUser = "MiniApp_NgDanhThanhTrung_Bot"; 
-            document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
+            document.getElementById('ref-link').value = `https://t.me/MiniApp_NgDanhThanhTrung_Bot/app?startapp=${rawUser.id}`;
             await updateUI();
             
-            setInterval(async () => {
-                try {
-                    const res = await fetch('/api/get-realtime-data', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ id: rawUser.id })
-                    });
-                    const data = await res.json();
-                    if (data.ok) {
-                        displayCoins = data.totalCoins;
-                        document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
-                        document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 20000).toLocaleString()} VNĐ`; // Updated rate based on server logic 20k = 1đ
-                        document.getElementById('u-diamonds').innerText = (data.diamonds || 0).toLocaleString();
-                    }
-                } catch (e) {}
-            }, 1000); 
-
+            // Cập nhật đếm ngược mỗi giây
             setInterval(updateMiningTimer, 1000);
         }
 
@@ -191,13 +166,17 @@
                 });
                 userData = await res.json();
                 
-                displayCoins = userData.totalCoins || 0;
-                document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
-                document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 20000).toLocaleString()} VNĐ`;
-                document.getElementById('u-level').innerText = userData.level || 1;
+                // Cập nhật thông tin cơ bản
+                document.getElementById('b-coins').innerText = Math.floor(userData.totalCoins).toLocaleString() + " XU";
+                document.getElementById('b-vnd').innerText = `≈ ${Math.floor(userData.totalCoins / 20000).toLocaleString()} VNĐ`;
+                document.getElementById('u-level').innerText = userData.level;
                 document.getElementById('u-diamonds').innerText = (userData.diamonds || 0).toLocaleString();
-                document.getElementById('mining-rate').innerText = (userData.miningRate * 21600).toLocaleString(); // rate/s * 6h
                 
+                // Hiển thị mức thưởng của phiên 6h
+                const sessionReward = userData.miningRate * 21600;
+                document.getElementById('mining-rate').innerText = sessionReward.toLocaleString();
+                
+                // Thanh quảng cáo
                 const ads = userData.adsWatchedToday || 0;
                 document.getElementById('count-ads').innerText = ads;
                 document.getElementById('bar-fill').style.width = Math.min((ads / 15) * 100, 100) + '%';
@@ -206,24 +185,72 @@
             } catch (e) { console.error(e); }
         }
 
-        // --- HÀM MỚI CHO QUY ĐỔI ---
-        function calcEx(type) {
-            if(type === 'buy') {
-                const val = document.getElementById('buy-dm').value || 0;
-                document.getElementById('buy-price').innerText = (val * 2000).toLocaleString();
-            } else {
-                const val = document.getElementById('sell-dm').value || 0;
-                document.getElementById('sell-price').innerText = (val * 1500).toLocaleString();
+        function updateMiningTimer() {
+            const btn = document.getElementById('btn-mining');
+            const timerText = document.getElementById('mining-timer');
+
+            if (!userData.isMining || !userData.miningStartedAt) {
+                btn.disabled = false;
+                btn.innerText = "BẮT ĐẦU ĐÀO (6H)";
+                timerText.innerText = "Sẵn sàng nhận thưởng mới!";
+                return;
             }
+
+            const now = new Date().getTime();
+            const start = new Date(userData.miningStartedAt).getTime();
+            const diff = now - start;
+            const SIX_HOURS = 6 * 60 * 60 * 1000;
+
+            if (diff >= SIX_HOURS) {
+                btn.disabled = false;
+                btn.innerText = "BẮT ĐẦU PHIÊN MỚI";
+                timerText.innerText = "Phiên cũ đã kết thúc. Hãy bấm để tiếp tục!";
+            } else {
+                const remaining = SIX_HOURS - diff;
+                const h = Math.floor(remaining / 3600000);
+                const m = Math.floor((remaining % 3600000) / 60000);
+                const s = Math.floor((remaining % 60000) / 1000);
+                
+                btn.disabled = true;
+                btn.innerText = `HỒI CHIÊU: ${h}h ${m}m ${s}s`;
+                timerText.innerText = "Tiền đã được cộng vào tài khoản của bạn!";
+            }
+        }
+
+        async function startMining() {
+            tg.HapticFeedback.impactOccurred('medium');
+            try {
+                const res = await fetch('/api/start-mining', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: rawUser.id })
+                });
+                const data = await res.json();
+                
+                if (data.ok) {
+                    tg.showAlert(`🔥 Thành công!\n💰 +${data.reward.toLocaleString()} Xu đã được cộng trực tiếp vào ví của bạn.`);
+                    await updateUI();
+                } else {
+                    tg.showAlert(data.msg || "Lỗi khi bắt đầu đào.");
+                }
+            } catch (e) {
+                tg.showAlert("Lỗi kết nối máy chủ!");
+            }
+        }
+
+        // --- Các hàm hỗ trợ khác (Quy đổi, Ads, Rút tiền) giữ nguyên ---
+        function calcEx(type) {
+            const val = type === 'buy' ? document.getElementById('buy-dm').value : document.getElementById('sell-dm').value;
+            const rate = type === 'buy' ? 2000 : 1500;
+            document.getElementById(type + '-price').innerText = (val * rate).toLocaleString();
         }
 
         async function processEx(type) {
             const amount = type === 'buy' ? document.getElementById('buy-dm').value : document.getElementById('sell-dm').value;
             if(!amount || amount <= 0) return tg.showAlert("Vui lòng nhập số lượng!");
-
             const endpoint = type === 'buy' ? '/api/exchange-to-diamond' : '/api/exchange-to-xu';
             
-            tg.showConfirm(`Xác nhận thực hiện giao dịch?`, async (ok) => {
+            tg.showConfirm(`Xác nhận giao dịch?`, async (ok) => {
                 if(!ok) return;
                 const res = await fetch(endpoint, {
                     method: 'POST',
@@ -232,14 +259,9 @@
                 });
                 const r = await res.json();
                 if(r.ok) {
-                    tg.showAlert("✅ Giao dịch thành công!");
-                    document.getElementById('buy-dm').value = "";
-                    document.getElementById('sell-dm').value = "";
-                    calcEx('buy'); calcEx('sell');
+                    tg.showAlert("✅ Giao dịch hoàn tất!");
                     updateUI();
-                } else {
-                    tg.showAlert(r.msg || "Lỗi giao dịch!");
-                }
+                } else tg.showAlert(r.msg);
             });
         }
 
@@ -252,52 +274,6 @@
             const r = await res.json();
             tg.showAlert(r.msg);
             updateUI();
-        }
-
-        // --- CÁC HÀM CŨ GIỮ NGUYÊN ---
-        function updateMiningTimer() {
-            if (!userData.isMining) {
-                const btn = document.getElementById('btn-mining');
-                btn.innerText = "BẮT ĐẦU ĐÀO (6H)";
-                btn.disabled = false;
-                btn.className = "mining-btn";
-                document.getElementById('mining-timer').innerText = "Máy đào đang chờ lệnh";
-                return;
-            }
-
-            const diff = new Date().getTime() - new Date(userData.miningStartedAt).getTime();
-            const SIX_HOURS = 6 * 60 * 60 * 1000;
-
-            if (diff >= SIX_HOURS) {
-                const btn = document.getElementById('btn-mining');
-                btn.innerText = "NHẬN XU NGAY";
-                btn.disabled = false;
-                btn.className = "mining-btn ready";
-                document.getElementById('mining-timer').innerText = "✅ Đã đào xong!";
-            } else {
-                const remaining = SIX_HOURS - diff;
-                const h = Math.floor(remaining / 3600000);
-                const m = Math.floor((remaining % 3600000) / 60000);
-                const s = Math.floor((remaining % 60000) / 1000);
-                document.getElementById('btn-mining').innerText = `ĐANG ĐÀO... ${h}h ${m}m ${s}s`;
-                document.getElementById('btn-mining').disabled = true;
-                document.getElementById('mining-timer').innerText = "Máy đang hoạt động hết công suất";
-            }
-        }
-
-        async function handleMining() {
-            tg.HapticFeedback.impactOccurred('medium');
-            const action = document.getElementById('btn-mining').classList.contains('ready') ? 'claim' : 'start';
-            const res = await fetch('/api/mining', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: rawUser.id, action })
-            });
-            const r = await res.json();
-            if (r.ok) {
-                if (action === 'claim') tg.showAlert(`🎉 Bạn đã nhận +${r.reward.toLocaleString()} XU!`);
-                updateUI();
-            } else tg.showAlert(r.msg);
         }
 
         function triggerAd(type) {
@@ -321,7 +297,7 @@
             });
             const r = await res.json();
             if (r.ok) {
-                tg.showAlert("🚀 Đã gửi yêu cầu thành công!");
+                tg.showAlert("🚀 Đã gửi yêu cầu rút tiền thành công!");
                 updateUI();
             } else tg.showAlert(r.msg);
         }
@@ -338,7 +314,7 @@
             const el = document.getElementById('ref-link');
             el.select();
             document.execCommand('copy');
-            tg.showAlert("📋 Đã sao chép link!");
+            tg.showAlert("📋 Đã sao chép link mời!");
         }
 
         init();
