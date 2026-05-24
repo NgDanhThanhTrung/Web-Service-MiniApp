@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Control - Siêu Cấp Mining</title>
     <style>
-        :root { --bg: #0b0e11; --card: #1e2329; --gold: #f1b90c; --green: #2ebd85; --blue: #3b82f6; --text: #eaecef; }
+        :root { --bg: #0b0e11; --card: #1e2329; --gold: #f1b90c; --green: #2ebd85; --blue: #3b82f6; --text: #eaecef; --diamond: #00d2ff; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
         h1, h2 { color: var(--gold); border-bottom: 1px solid #333; padding-bottom: 10px; }
         
@@ -14,17 +14,20 @@
         button { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn-load { background: var(--gold); color: black; }
         
-        .stats-bar { display: flex; gap: 20px; margin-bottom: 20px; }
-        .stat-card { background: var(--card); padding: 15px; border-radius: 10px; border: 1px solid #333; flex: 1; }
+        .stats-bar { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: var(--card); padding: 15px; border-radius: 10px; border: 1px solid #333; flex: 1; min-width: 200px; text-align: center; }
+        .stat-card b { font-size: 1.2em; color: var(--gold); }
         
         table { width: 100%; border-collapse: collapse; margin-bottom: 40px; background: var(--card); font-size: 13px; border-radius: 10px; overflow: hidden; }
         th, td { padding: 12px; border: 1px solid #333; text-align: left; }
         th { background: #2b3139; color: var(--gold); }
         
-        .btn-done { background: var(--green); color: white; font-size: 11px; padding: 8px 12px; cursor: pointer; }
+        .btn-done { background: var(--green); color: white; font-size: 11px; padding: 8px 12px; cursor: pointer; border-radius: 5px; }
         .info-cell { max-width: 250px; font-size: 12px; color: #848e9c; }
         .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
         .badge-mining { background: var(--green); color: black; }
+        .badge-level { background: var(--blue); color: white; }
+        .diamond-text { color: var(--diamond); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -36,7 +39,8 @@
         <button class="btn-load" onclick="loadData()">🔄 TẢI/LÀM MỚI</button>
     </div>
 
-    <div class="stats-bar" id="stats"></div>
+    <div class="stats-bar" id="stats">
+        </div>
 
     <h2>💰 YÊU CẦU RÚT TIỀN</h2>
     <table id="withdrawTable"></table>
@@ -53,41 +57,76 @@
 
             try {
                 const res = await fetch(`/api/admin/all-data?pass=${pass}`);
+                if (!res.ok) throw new Error("Unauthorized");
                 const data = await res.json();
                 allUsers = data.users;
 
-                // Render Stats
+                // Render Stats dựa trên dữ liệu server.js
+                const totalCoins = data.users.reduce((a,b) => a + (b.totalCoins || 0), 0);
+                const totalDiamonds = data.users.reduce((a,b) => a + (b.diamonds || 0), 0);
+                
                 document.getElementById('stats').innerHTML = `
-                    <div class="stat-card">Tổng người dùng: <b>${data.users.length}</b></div>
-                    <div class="stat-card">Tổng xu hệ thống: <b>${data.users.reduce((a,b)=>a+(b.totalCoins||0),0).toLocaleString()}</b></div>
+                    <div class="stat-card">Tổng người dùng: <br><b>${data.users.length}</b></div>
+                    <div class="stat-card">Tổng xu hệ thống: <br><b>${Math.floor(totalCoins).toLocaleString()}</b></div>
+                    <div class="stat-card">Tổng kim cương: <br><b style="color:var(--diamond)">${totalDiamonds.toLocaleString()} 💎</b></div>
+                    <div class="stat-card">Yêu cầu chờ: <br><b>${data.withdraws.filter(w => w.status === 'Chờ duyệt').length}</b></div>
                 `;
 
                 // Render Withdraws
                 let wHtml = `<tr><th>Thời gian</th><th>Người dùng</th><th>Số Xu</th><th>Thông tin</th><th>Trạng thái</th></tr>`;
                 data.withdraws.forEach(w => {
                     wHtml += `<tr>
-                        <td>${new Date(w.createdAt).toLocaleDateString()}</td>
-                        <td><b>${w.name}</b></td>
+                        <td>${new Date(w.createdAt).toLocaleString('vi-VN')}</td>
+                        <td><b>${w.name}</b><br><small>ID: ${w.userId}</small></td>
                         <td style="color:var(--gold)">${w.amountXu.toLocaleString()}</td>
-                        <td class="info-cell">${w.method}: ${w.address}</td>
-                        <td>${w.status === 'Chờ duyệt' ? `<button class="btn-done" onclick="approve('${w._id}')">DUYỆT</button>` : '✅'}</td>
+                        <td class="info-cell"><b>${w.method}</b>: ${w.address}</td>
+                        <td>${w.status === 'Chờ duyệt' ? 
+                            `<button class="btn-done" onclick="approve('${w._id}')">DUYỆT</button>` : 
+                            `<span style="color:var(--green)">✅ ${w.status}</span>`}</td>
                     </tr>`;
                 });
                 document.getElementById('withdrawTable').innerHTML = wHtml;
 
                 renderUserTable(allUsers);
-            } catch (e) { alert("Lỗi kết nối hoặc sai mật khẩu!"); }
+            } catch (e) { 
+                alert("Lỗi: Sai mật khẩu hoặc không thể kết nối server!"); 
+                console.error(e);
+            }
         }
 
         function renderUserTable(users) {
-            let uHtml = `<tr><th>Hạng</th><th>Tên (@username)</th><th>Số dư</th><th>QC Hôm nay</th><th>Trạng thái</th></tr>`;
+            // Cập nhật các cột: Cấp độ, Kim cương, Tốc độ đào theo Schema User.js
+            let uHtml = `<tr>
+                <th>Hạng</th>
+                <th>Tên / TelegramID</th>
+                <th>Số dư (Xu)</th>
+                <th>Kim cương</th>
+                <th>Cấp độ</th>
+                <th>Tốc độ (s)</th>
+                <th>QC (15)</th>
+                <th>Trạng thái</th>
+            </tr>`;
+            
+            users.sort((a, b) => (b.totalCoins || 0) - (a.totalCoins || 0)); // Sắp xếp theo số dư
+
             users.forEach((u, i) => {
                 uHtml += `<tr>
                     <td>${i+1}</td>
-                    <td><b>${u.name}</b><br><small>@${u.username}</small></td>
-                    <td>${(u.totalCoins||0).toLocaleString()}</td>
-                    <td>${u.adsWatchedToday||0}/15</td>
-                    <td>${u.isMining ? '<span class="badge badge-mining">ĐANG ĐÀO</span>' : 'Nghỉ'}</td>
+                    <td>
+                        <b>${u.name}</b><br>
+                        <small>@${u.username || 'n/a'}</small><br>
+                        <small style="color:#666">${u.telegramId}</small>
+                    </td>
+                    <td style="color:var(--gold)">${Math.floor(u.totalCoins || 0).toLocaleString()}</td>
+                    <td class="diamond-text">${(u.diamonds || 0).toLocaleString()} 💎</td>
+                    <td><span class="badge badge-level">Lvl ${u.level || 1}</span></td>
+                    <td>${(u.miningRate || 0).toFixed(1)}/s</td>
+                    <td>${u.adsWatchedToday || 0}/15</td>
+                    <td>
+                        ${u.isMining ? 
+                            '<span class="badge badge-mining">ĐANG ĐÀO</span>' : 
+                            '<span style="color:#555">Nghỉ</span>'}
+                    </td>
                 </tr>`;
             });
             document.getElementById('userTable').innerHTML = uHtml;
@@ -95,19 +134,33 @@
 
         function filterUsers() {
             const query = document.getElementById('search').value.toLowerCase();
-            const filtered = allUsers.filter(u => u.name?.toLowerCase().includes(query) || u.telegramId?.includes(query));
+            const filtered = allUsers.filter(u => 
+                u.name?.toLowerCase().includes(query) || 
+                u.telegramId?.toString().includes(query) ||
+                u.username?.toLowerCase().includes(query)
+            );
             renderUserTable(filtered);
         }
 
         async function approve(id) {
-            if(!confirm("Xác nhận đã chuyển tiền?")) return;
+            if(!confirm("Xác nhận đã chuyển tiền cho người dùng này?")) return;
             const pass = document.getElementById('pass').value;
-            await fetch('/api/admin/approve-withdraw', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id, pass })
-            });
-            loadData();
+            try {
+                const res = await fetch('/api/admin/approve-withdraw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id, pass })
+                });
+                const r = await res.json();
+                if(r.ok) {
+                    alert("Đã duyệt yêu cầu!");
+                    loadData();
+                } else {
+                    alert("Lỗi: " + r.msg);
+                }
+            } catch (e) {
+                alert("Không thể thực hiện lệnh duyệt!");
+            }
         }
     </script>
 </body>
