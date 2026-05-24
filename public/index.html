@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; --green: #0ecb81; }
+        :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; --green: #0ecb81; --diamond: #00d2ff; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; -webkit-user-select: none; }
         .header { text-align: center; margin-bottom: 20px; }
         .user-info { color: var(--gold); font-size: 14px; margin-bottom: 10px; font-weight: bold; }
@@ -28,7 +28,7 @@
         @keyframes pulse { 0% {box-shadow: 0 0 0 0 rgba(14, 203, 129, 0.4);} 70% {box-shadow: 0 0 0 10px rgba(14, 203, 129, 0);} 100% {box-shadow: 0 0 0 0 rgba(14, 203, 129, 0);} }
 
         .tabs { display: flex; gap: 8px; background: var(--card); padding: 10px 15px; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; border-top: 1px solid #333; padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px)); }
-        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 20px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 13px; }
+        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 20px; background: none; color: #848e9c; cursor: pointer; transition: 0.3s; font-size: 11px; }
         .tab-btn.active { background: #2b3139; color: var(--gold); font-weight: bold; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -38,6 +38,12 @@
         .bar-bg { width: 100%; height: 10px; background: #000; border-radius: 10px; margin-top: 10px; overflow: hidden; }
         #bar-fill { width: 0%; height: 100%; background: var(--gold); transition: 1s ease; }
         .btn-main { background: var(--gold); color: black; padding: 15px; border-radius: 25px; border: none; font-weight: bold; font-size: 15px; width: 100%; cursor: pointer; }
+
+        /* Style mới cho Quy đổi */
+        .ex-container { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #333; margin-bottom: 15px; }
+        .ex-label { font-size: 12px; color: #848e9c; margin-bottom: 10px; display: block; text-align: center; }
+        .ex-group { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .btn-ex { padding: 10px 20px; border-radius: 15px; border: none; font-weight: bold; cursor: pointer; min-width: 80px; }
     </style>
 </head>
 <body>
@@ -48,7 +54,7 @@
                 <small>SỐ DƯ HIỆN TẠI</small>
                 <h1 id="b-coins" style="margin: 5px 0; font-size: 30px;">0 XU</h1>
                 <p id="b-vnd" style="margin: 0; color: var(--gold); font-weight: bold;">≈ 0 VNĐ</p>
-                <div style="margin-top: 10px; font-size: 12px; color: #0ecb81;">💎 Kim cương: <span id="u-diamonds">0</span></div>
+                <div style="margin-top: 10px; font-size: 12px; color: var(--diamond);">💎 Kim cương: <span id="u-diamonds">0</span></div>
             </div>
         </header>
 
@@ -58,6 +64,8 @@
                     <div id="mining-timer" style="font-size: 12px; color: #848e9c; margin-bottom: 8px;">Đang tải...</div>
                     <button id="btn-mining" class="mining-btn" onclick="handleMining()">KIỂM TRA...</button>
                     <p style="font-size: 10px; color: #555; margin-top: 5px;">Tốc độ: <span id="mining-rate">250,000</span> XU / 6h</p>
+                    
+                    <button onclick="upgradeLevel()" style="margin-top: 10px; background: none; border: 1px solid var(--blue); color: var(--blue); padding: 5px 15px; border-radius: 10px; font-size: 11px;">NÂNG CẤP (100 💎)</button>
                 </div>
 
                 <div class="task-list">
@@ -77,6 +85,28 @@
                         </div>
                         <div class="task-action">Mở</div>
                     </div>
+                </div>
+            </div>
+
+            <div id="exchange" class="tab-content">
+                <span class="ex-label">Tỷ giá: Mua 2,000 Xu | Bán 1,500 Xu</span>
+                
+                <div class="ex-container" style="border-color: var(--blue);">
+                    <h3 style="margin-top:0; color: var(--blue); font-size: 16px;">🛒 MUA KIM CƯƠNG</h3>
+                    <div class="ex-group">
+                        <input type="number" id="buy-dm" class="soft-input" style="margin-bottom:0;" placeholder="Số lượng 💎" oninput="calcEx('buy')">
+                        <button class="btn-ex" style="background: var(--blue); color:white;" onclick="processEx('buy')">MUA</button>
+                    </div>
+                    <small style="color: #848e9c;">Giá dự tính: <span id="buy-price" style="color: var(--gold);">0</span> Xu</small>
+                </div>
+
+                <div class="ex-container" style="border-color: var(--green);">
+                    <h3 style="margin-top:0; color: var(--green); font-size: 16px;">💰 BÁN KIM CƯƠNG</h3>
+                    <div class="ex-group">
+                        <input type="number" id="sell-dm" class="soft-input" style="margin-bottom:0;" placeholder="Số lượng 💎" oninput="calcEx('sell')">
+                        <button class="btn-ex" style="background: var(--green); color:white;" onclick="processEx('sell')">BÁN</button>
+                    </div>
+                    <small style="color: #848e9c;">Nhận dự tính: <span id="sell-price" style="color: var(--gold);">0</span> Xu</small>
                 </div>
             </div>
 
@@ -108,9 +138,10 @@
         </main>
 
         <div class="tabs">
-            <button class="tab-btn active" onclick="openTab(event, 'play')">⛏️ ĐÀO XU</button>
-            <button class="tab-btn" onclick="openTab(event, 'ref')">👥 MỜI BẠN</button>
-            <button class="tab-btn" onclick="openTab(event, 'bank')">🏦 RÚT TIỀN</button>
+            <button class="tab-btn active" onclick="openTab(event, 'play')">⛏️ ĐÀO</button>
+            <button class="tab-btn" onclick="openTab(event, 'exchange')">💎 ĐỔI</button>
+            <button class="tab-btn" onclick="openTab(event, 'ref')">👥 MỜI</button>
+            <button class="tab-btn" onclick="openTab(event, 'bank')">🏦 RÚT</button>
         </div>
     </div>
 
@@ -126,38 +157,31 @@
         const ADS_CONFIG = { video: "30955", interstitial: "int-30961", banner: "task-30959" };
 
         async function init() {
-        document.getElementById('u-name').innerText = rawUser.first_name;
-        const botUser = "MiniApp_NgDanhThanhTrung_Bot"; 
-        document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
-    
-        // Gọi UI lần đầu
-        await updateUI();
-    
-        // API LẤY DỮ LIỆU THỜI GIAN THỰC TỪ SERVER MỖI GIÂY
-        setInterval(async () => {
-            try {
-                const res = await fetch('/api/get-realtime-data', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ id: rawUser.id })
-                });
-                const data = await res.json();
+            document.getElementById('u-name').innerText = rawUser.first_name;
+            const botUser = "MiniApp_NgDanhThanhTrung_Bot"; 
+            document.getElementById('ref-link').value = `https://t.me/${botUser}/app?startapp=${rawUser.id}`;
+            await updateUI();
             
-                if (data.ok) {
-                    // Cập nhật số dư thực từ DB
-                    displayCoins = data.totalCoins;
-                    document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
-                    document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 2000).toLocaleString()} VNĐ`;
-                    document.getElementById('u-diamonds').innerText = (data.diamonds || 0).toLocaleString();
-                }
-            } catch (e) {
-                console.error("Lỗi cập nhật real-time:", e);
-            }
-        }, 1000); 
+            setInterval(async () => {
+                try {
+                    const res = await fetch('/api/get-realtime-data', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ id: rawUser.id })
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        displayCoins = data.totalCoins;
+                        document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
+                        document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 20000).toLocaleString()} VNĐ`; // Updated rate based on server logic 20k = 1đ
+                        document.getElementById('u-diamonds').innerText = (data.diamonds || 0).toLocaleString();
+                    }
+                } catch (e) {}
+            }, 1000); 
 
-        // Update timer mining mỗi giây (để hiển thị đúng countdown)
-        setInterval(updateMiningTimer, 1000);
-    }
+            setInterval(updateMiningTimer, 1000);
+        }
+
         async function updateUI() {
             try {
                 const res = await fetch('/api/user-status', {
@@ -168,11 +192,11 @@
                 userData = await res.json();
                 
                 displayCoins = userData.totalCoins || 0;
-                document.getElementById('b-coins').innerText = displayCoins.toLocaleString() + " XU";
-                document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 2000).toLocaleString()} VNĐ`;
+                document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
+                document.getElementById('b-vnd').innerText = `≈ ${Math.floor(displayCoins / 20000).toLocaleString()} VNĐ`;
                 document.getElementById('u-level').innerText = userData.level || 1;
                 document.getElementById('u-diamonds').innerText = (userData.diamonds || 0).toLocaleString();
-                document.getElementById('mining-rate').innerText = (250000 + (userData.level - 1) * 100000).toLocaleString();
+                document.getElementById('mining-rate').innerText = (userData.miningRate * 21600).toLocaleString(); // rate/s * 6h
                 
                 const ads = userData.adsWatchedToday || 0;
                 document.getElementById('count-ads').innerText = ads;
@@ -182,22 +206,55 @@
             } catch (e) { console.error(e); }
         }
 
-        async function syncCoinsWithServer() {
-            if (!userData.isMining) return;
-            try {
-                const res = await fetch('/api/sync-mining', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ id: rawUser.id })
-                });
-                const data = await res.json();
-                if (data.ok) {
-                    displayCoins = data.newTotal; // Cập nhật lại chuẩn xác theo server
-                    document.getElementById('b-coins').innerText = Math.floor(displayCoins).toLocaleString() + " XU";
-                }
-            } catch (e) { console.error("Lỗi đồng bộ:", e); }
+        // --- HÀM MỚI CHO QUY ĐỔI ---
+        function calcEx(type) {
+            if(type === 'buy') {
+                const val = document.getElementById('buy-dm').value || 0;
+                document.getElementById('buy-price').innerText = (val * 2000).toLocaleString();
+            } else {
+                const val = document.getElementById('sell-dm').value || 0;
+                document.getElementById('sell-price').innerText = (val * 1500).toLocaleString();
+            }
         }
 
+        async function processEx(type) {
+            const amount = type === 'buy' ? document.getElementById('buy-dm').value : document.getElementById('sell-dm').value;
+            if(!amount || amount <= 0) return tg.showAlert("Vui lòng nhập số lượng!");
+
+            const endpoint = type === 'buy' ? '/api/exchange-to-diamond' : '/api/exchange-to-xu';
+            
+            tg.showConfirm(`Xác nhận thực hiện giao dịch?`, async (ok) => {
+                if(!ok) return;
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: rawUser.id, amountDiamond: parseInt(amount) })
+                });
+                const r = await res.json();
+                if(r.ok) {
+                    tg.showAlert("✅ Giao dịch thành công!");
+                    document.getElementById('buy-dm').value = "";
+                    document.getElementById('sell-dm').value = "";
+                    calcEx('buy'); calcEx('sell');
+                    updateUI();
+                } else {
+                    tg.showAlert(r.msg || "Lỗi giao dịch!");
+                }
+            });
+        }
+
+        async function upgradeLevel() {
+            const res = await fetch('/api/upgrade', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: rawUser.id })
+            });
+            const r = await res.json();
+            tg.showAlert(r.msg);
+            updateUI();
+        }
+
+        // --- CÁC HÀM CŨ GIỮ NGUYÊN ---
         function updateMiningTimer() {
             if (!userData.isMining) {
                 const btn = document.getElementById('btn-mining');
@@ -255,10 +312,8 @@
             const amount = document.getElementById('w-amount').value;
             const info = document.getElementById('w-info').value;
             const method = document.getElementById('w-method').value;
-
             if (amount < 4000000) return tg.showAlert("Tối thiểu rút 4.000.000 XU!");
             if (!info) return tg.showAlert("Vui lòng điền thông tin nhận tiền!");
-
             const res = await fetch('/api/withdraw', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
