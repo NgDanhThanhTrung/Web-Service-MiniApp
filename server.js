@@ -57,7 +57,7 @@ app.get('/api/config', (req, res) => {
 });
 
 // ==========================================
-// 5. HỆ THỐNG QUẢNG CÁO - CẬP NHẬT CỘNG TIỀN REALTIME
+// 5. HỆ THỐNG QUẢNG CÁO - FIX LỖI BANNER & REALTIME
 // ==========================================
 async function processAdReward(userId, type, amount) {
     if (!userId) return { ok: false, msg: 'Thiếu userId' };
@@ -68,7 +68,7 @@ async function processAdReward(userId, type, amount) {
         const now = new Date();
         const today = now.toDateString();
 
-        // Reset bộ đếm ngày mới
+        // Reset bộ đếm ngày mới nếu qua ngày tiếp theo
         if (user.lastActiveDay !== today) {
             user.dailyVideo = 0;
             user.dailyInterstitial = 0;
@@ -77,17 +77,25 @@ async function processAdReward(userId, type, amount) {
             user.lastActiveDay = today;
         }
 
+        // Đảm bảo tạo khóa chính xác để mapping với Database Schema (ví dụ: dailyVideo, dailyBanner)
         const limitKey = `daily${type.charAt(0).toUpperCase() + type.slice(1)}`;
-        if (user[limitKey] >= 15) return { ok: false, msg: 'Hôm nay đã xem hết lượt!' };
+        
+        // Khởi tạo giá trị nếu chưa có để tránh lỗi so sánh undefined
+        if (user[limitKey] === undefined) user[limitKey] = 0;
 
-        // CỘNG XU VÀO DATABASE
+        // Giới hạn: Banner được xem tối đa 30 lần, Video/Interstitial tối đa 15 lần
+        const maxLimit = (type === 'banner') ? 30 : 15;
+        if (user[limitKey] >= maxLimit) {
+            return { ok: false, msg: `Hôm nay bạn đã xem hết lượt quảng cáo ${type}!` };
+        }
+
+        // CỘNG XU VÀO DATABASE VÀ UPDATE REALTIME
         user.totalCoins = (user.totalCoins || 0) + amount;
-        user[limitKey] = (user[limitKey] || 0) + 1;
+        user[limitKey] += 1;
         user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
 
         await user.save();
         
-        // Trả về dữ liệu chi tiết để Frontend cập nhật ngay lập tức
         return { 
             ok: true, 
             totalCoins: user.totalCoins, 
@@ -95,12 +103,15 @@ async function processAdReward(userId, type, amount) {
             adsWatchedToday: user.adsWatchedToday,
             reward: amount
         };
-    } catch (e) { return { ok: false, msg: "Lỗi hệ thống" }; }
+    } catch (e) { 
+        console.error("Lỗi Ads:", e);
+        return { ok: false, msg: "Lỗi hệ thống khi xử lý quảng cáo" }; 
+    }
 }
 
 app.get('/api/ads-rewarded', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'video', 250000);
-    res.json(result); // Trả về JSON thay vì text đơn thuần
+    res.json(result); 
 });
 
 app.get('/api/ads-interstitial', async (req, res) => {
@@ -109,8 +120,72 @@ app.get('/api/ads-interstitial', async (req, res) => {
 });
 
 app.get('/api/ads-banner', async (req, res) => {
+    // Sửa lỗi xử lý phần cộng tiền Banner mượt mà hơn
     const result = await processAdReward(req.query.userId, 'banner', 25000);
     res.json(result);
+});
+
+// ==========================================
+// THÊM MỚI TÍNH NĂNG: ĐIỂM DANH HÀNG NGÀY
+// ==========================================
+app.post('/api/daily-checkin', async (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: "Thiếu ID người dùng" });
+
+    try {
+        const user = await User.findOne({ telegramId: id.toString() });
+        if (!user) return res.json({ ok: false, msg: "Không tìm thấy người dùng" });
+
+        const now = new Date();
+        const todayStr = now.toDateString();
+
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toDateString();
+
+        // Kiểm tra/khởi tạo cấu trúc dailyCheckin trong document user
+        if (!user.dailyCheckin) {
+            user.dailyCheckin = { lastCheckinDay: "", streak: 0 };
+        }
+
+        // 1. Kiểm tra xem hôm nay đã điểm danh chưa
+        if (user.dailyCheckin.lastCheckinDay === todayStr) {
+            return res.json({ ok: false, msg: "Hôm nay bạn đã nhận quà rồi! Hãy quay lại vào ngày mai nhé. 😉" });
+        }
+
+        // 2. Tính chuỗi ngày liên tiếp (Streak)
+        if (user.dailyCheckin.lastCheckinDay === yesterdayStr) {
+            user.dailyCheckin.streak = (user.dailyCheckin.streak % 7) + 1; // Chu kỳ tuần hoàn 7 ngày
+        } else {
+            user.dailyCheckin.streak = 1; // Quá ngày -> Reset chuỗi về ngày đầu tiên
+        }
+
+        // 3. Danh sách phần thưởng Xu từ Ngày 1 đến Ngày 7
+        const rewards = [50000, 100000, 150000, 200000, 300000, 400000, 500000];
+        const currentStreak = user.dailyCheckin.streak;
+        const rewardXu = rewards[currentStreak - 1];
+
+        // 4. Tiến hành cộng thưởng và lưu trạng thái
+        user.totalCoins = (user.totalCoins || 0) + rewardXu;
+        user.dailyCheckin.lastCheckinDay = todayStr;
+        user.lastActiveDay = todayStr;
+
+        await user.save();
+
+        res.json({
+            ok: true,
+            msg: `🎉 Điểm danh Ngày ${currentStreak} thành công! Bạn nhận được +${rewardXu.toLocaleString()} Xu.`,
+            user: {
+                ...user._doc,
+                id: user.telegramId,
+                coins: user.totalCoins,
+                vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE)
+            }
+        });
+
+    } catch (e) {
+        res.status(500).json({ ok: false, msg: "Lỗi hệ thống điểm danh: " + e.message });
+    }
 });
 
 // ==========================================
@@ -126,7 +201,8 @@ app.post('/api/user-status', async (req, res) => {
         if (!user) {
             user = new User({ 
                 telegramId: id.toString(), name: first_name, username: username || 'n/a', 
-                lastActiveDay: today, level: 1, totalCoins: 0, diamonds: 0, miningRate: 12.0
+                lastActiveDay: today, level: 1, totalCoins: 0, diamonds: 0, miningRate: 12.0,
+                dailyCheckin: { lastCheckinDay: "", streak: 0 }
             });
             await user.save();
         } else if (user.lastActiveDay !== today) {
@@ -145,12 +221,11 @@ app.post('/api/user-status', async (req, res) => {
     } catch (e) { res.status(500).json(e); }
 });
 
-// Thêm endpoint phụ để client polling (nếu cần)
 app.post('/api/get-realtime-data', async (req, res) => {
     try {
         const user = await User.findOne({ telegramId: req.body.id.toString() });
         if (user) {
-            res.json({ ok: true, totalCoins: user.totalCoins, diamonds: user.diamonds });
+            res.json({ ok: true, totalCoins: user.totalCoins, diamonds: user.diamonds, dailyCheckin: user.dailyCheckin });
         } else res.json({ ok: false });
     } catch (e) { res.json({ ok: false }); }
 });
