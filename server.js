@@ -6,9 +6,12 @@ const path = require('path');
 const app = express();
 const { ADMIN_PASS, BOT_USERNAME, MONGODB_URI } = process.env;
 
+// --- CẤU HÌNH QUY ƯỚC KINH TẾ ---
+const EXCHANGE_RATE = 20000; // 20,000 Xu = 1 VNĐ
+
 // --- KẾT NỐI MONGODB ---
 mongoose.connect(MONGODB_URI)
-    .then(() => console.log('✅ Hệ thống đã kết nối Database MongoDB'))
+    .then(() => console.log('✅ Hệ thống đã kết nối Database MongoDB (Kinh tế 2.0)'))
     .catch(err => console.error('❌ Lỗi kết nối DB:', err));
 
 const User = require('./models/User');
@@ -34,7 +37,10 @@ app.get(['/', '/app'], (req, res) => res.sendFile(path.join(__dirname, 'public/i
 app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
 
 app.get('/api/config', (req, res) => {
-    res.json({ botUser: BOT_USERNAME || 'YourBotUsername' });
+    res.json({ 
+        botUser: BOT_USERNAME || 'YourBotUsername',
+        exchangeRate: EXCHANGE_RATE 
+    });
 });
 
 // --- HÀM XỬ LÝ PHẦN THƯỞNG DÙNG CHUNG ---
@@ -89,7 +95,7 @@ app.get('/api/ads-banner', async (req, res) => {
     res.send(result.ok ? 'OK' : result.msg);
 });
 
-// --- API USER STATUS ---
+// --- API USER STATUS (CẬP NHẬT QUY ĐỔI VNĐ) ---
 app.post('/api/user-status', async (req, res) => {
     const { id, first_name, username } = req.body;
     if (!id) return res.status(400).send("Missing ID");
@@ -114,13 +120,14 @@ app.post('/api/user-status', async (req, res) => {
             ...user._doc,
             id: user.telegramId,
             coins: user.totalCoins,
+            vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE), // Quy đổi 20,000 : 1
             first_name: user.name,
             miningStatus: user.isMining,
             miningTime: user.miningStartedAt
         });
     } catch (e) { res.status(500).json(e); }
 });
-// --- THÊM API NÀY VÀO ĐÂY ---
+
 app.post('/api/get-realtime-data', async (req, res) => {
     const { id } = req.body;
     try {
@@ -128,44 +135,43 @@ app.post('/api/get-realtime-data', async (req, res) => {
         if (!user) return res.json({ ok: false });
 
         let currentTotal = user.totalCoins;
-        // Tính toán số xu tạm thời nếu đang đào
         if (user.isMining && user.miningStartedAt) {
             const diffSeconds = (new Date() - new Date(user.miningStartedAt)) / 1000;
-            // Dùng miningRate từ DB hoặc mặc định 12.0
             const rate = user.miningRate || 12.0;
             currentTotal += (diffSeconds * rate);
         }
 
         res.json({ 
             ok: true, 
-            totalCoins: Math.floor(currentTotal), 
+            totalCoins: Math.floor(currentTotal),
+            vndEstimate: Math.floor(currentTotal / EXCHANGE_RATE), // Quy đổi realtime
             diamonds: user.diamonds 
         });
     } catch (e) {
         res.json({ ok: false });
     }
 });
-// --- API MINING TICK (Ghi trực tiếp vào DB mỗi giây) ---
+
 app.post('/api/mining-tick', async (req, res) => {
     const { id } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
         if (!user || !user.isMining) return res.json({ ok: false });
 
-        // Tính tốc độ theo level (12.0 base + bonus)
         const ratePerSecond = 12.0 + ((user.level || 1) - 1) * 0.2;
-        
-        // Cộng trực tiếp vào tổng xu
         user.totalCoins += ratePerSecond;
-        await user.save(); // Ghi thẳng vào MongoDB
+        await user.save();
 
-        res.json({ ok: true, currentTotal: Math.floor(user.totalCoins) });
+        res.json({ 
+            ok: true, 
+            currentTotal: Math.floor(user.totalCoins),
+            vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE)
+        });
     } catch (e) { 
         res.json({ ok: false }); 
     }
 });
 
-// --- CẬP NHẬT LẠI API MINING START/CLAIM ---
 app.post('/api/mining', async (req, res) => {
     const { id, action } = req.body;
     try {
@@ -181,7 +187,6 @@ app.post('/api/mining', async (req, res) => {
         }
 
         if (action === 'claim') {
-            // Sau khi đã chạy tick mỗi giây, nút claim có thể dùng để reset trạng thái
             user.isMining = false;
             user.miningStartedAt = null;
             await user.save();
@@ -189,7 +194,7 @@ app.post('/api/mining', async (req, res) => {
         }
     } catch (e) { res.json({ ok: false }); }
 });
-// --- NÂNG CẤP & THƯỞNG CỘT MỐC ---
+
 app.post('/api/upgrade', async (req, res) => {
     const { id } = req.body;
     try {
@@ -212,7 +217,6 @@ app.post('/api/upgrade', async (req, res) => {
     } catch (e) { res.json({ ok: false }); }
 });
 
-// --- RÚT TIỀN ---
 app.post('/api/withdraw', async (req, res) => {
     const { id, amountXu, method, address } = req.body;
     try {
@@ -223,7 +227,7 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ ok: false, msg: `Cần xem đủ 15 QC hôm nay (${user.adsWatchedToday}/15)` });
         }
 
-        const MIN_WITHDRAW = 4000000;
+        const MIN_WITHDRAW = 4000000; // 4 triệu xu = 200k VNĐ
         if (amountXu < MIN_WITHDRAW) return res.json({ ok: false, msg: "Tối thiểu 4.000.000 Xu" });
         if (user.totalCoins < amountXu) return res.json({ ok: false, msg: "Số dư không đủ" });
 
@@ -236,7 +240,6 @@ app.post('/api/withdraw', async (req, res) => {
     } catch (e) { res.json({ ok: false }); }
 });
 
-// --- ADMIN & OTHERS ---
 app.get('/api/admin/all-data', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.sendStatus(403);
     try {
