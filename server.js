@@ -9,11 +9,12 @@ const { ADMIN_PASS, BOT_USERNAME, MONGODB_URI } = process.env;
 // ==========================================
 // 1. CẤU HÌNH QUY ƯỚC KINH TẾ & NÂNG CẤP
 // ==========================================
-const EXCHANGE_RATE = 20000;       // 20,000 Xu = 1 VNĐ
-const XU_PER_DIAMOND_BUY = 2000;   // 2,000 Xu đổi được 1 💎
-const XU_PER_DIAMOND_SELL = 1500;  // 1 💎 đổi lại được 1,500 Xu
-const UPGRADE_COST_DIAMOND = 100;  // Phí cố định 100 💎 mỗi lần lên cấp
-const RATE_INCREASE_PER_LEVEL = 0.2; // Tăng 1 cấp tốc độ tăng thêm 0.2 xu/s
+const EXCHANGE_RATE = 20000;       
+const XU_PER_DIAMOND_BUY = 2000;   
+const XU_PER_DIAMOND_SELL = 1500;  
+const UPGRADE_COST_DIAMOND = 100;  
+const RATE_INCREASE_PER_LEVEL = 0.2; 
+const MINING_SESSION_HOURS = 6; // Thời gian 1 phiên đào
 
 // ==========================================
 // 2. KẾT NỐI DATABASE MONGODB
@@ -24,7 +25,6 @@ mongoose.connect(MONGODB_URI)
 
 const User = require('./models/User');
 
-// --- SCHEMA LƯU TRỮ YÊU CẦU RÚT TIỀN ---
 const WithdrawSchema = new mongoose.Schema({
     userId: String,
     name: String,
@@ -57,7 +57,7 @@ app.get('/api/config', (req, res) => {
 });
 
 // ==========================================
-// 5. HỆ THỐNG QUẢNG CÁO (ADSGRAM CALLBACK)
+// 5. HỆ THỐNG QUẢNG CÁO
 // ==========================================
 async function processAdReward(userId, type, amount) {
     if (!userId) return { ok: false, msg: 'Thiếu userId' };
@@ -68,7 +68,6 @@ async function processAdReward(userId, type, amount) {
         const now = new Date();
         const today = now.toDateString();
 
-        // Reset bộ đếm ngày mới
         if (user.lastActiveDay !== today) {
             user.dailyVideo = 0;
             user.dailyInterstitial = 0;
@@ -131,32 +130,9 @@ app.post('/api/user-status', async (req, res) => {
             ...user._doc,
             id: user.telegramId,
             coins: user.totalCoins,
-            vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE),
-            miningStatus: user.isMining
+            vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE)
         });
     } catch (e) { res.status(500).json(e); }
-});
-
-app.post('/api/get-realtime-data', async (req, res) => {
-    const { id } = req.body;
-    try {
-        const user = await User.findOne({ telegramId: id.toString() });
-        if (!user) return res.json({ ok: false });
-
-        let currentTotal = user.totalCoins;
-        if (user.isMining && user.miningStartedAt) {
-            const diffSeconds = (new Date() - new Date(user.miningStartedAt)) / 1000;
-            const rate = user.miningRate || 12.0;
-            currentTotal += (diffSeconds * rate);
-        }
-
-        res.json({ 
-            ok: true, 
-            totalCoins: Math.floor(currentTotal),
-            vndEstimate: Math.floor(currentTotal / EXCHANGE_RATE),
-            diamonds: user.diamonds 
-        });
-    } catch (e) { res.json({ ok: false }); }
 });
 
 // ==========================================
@@ -199,7 +175,6 @@ app.post('/api/upgrade', async (req, res) => {
 
         user.diamonds -= UPGRADE_COST_DIAMOND;
         user.level += 1;
-        // Cập nhật: Mỗi cấp tăng thêm 0.2 xu/s
         user.miningRate = (user.miningRate || 12.0) + RATE_INCREASE_PER_LEVEL;
 
         let bonus = "";
@@ -214,38 +189,47 @@ app.post('/api/upgrade', async (req, res) => {
 });
 
 // ==========================================
-// 8. LOGIC ĐÀO (MINING)
+// 8. LOGIC ĐÀO (MINING) - CẬP NHẬT TRỰC TIẾP
 // ==========================================
-app.post('/api/mining', async (req, res) => {
-    const { id, action } = req.body;
+app.post('/api/start-mining', async (req, res) => {
+    const { id } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        if (action === 'start') {
-            user.isMining = true;
-            user.miningStartedAt = new Date();
-        } else {
-            user.isMining = false;
-            user.miningStartedAt = null;
+        if (!user) return res.json({ ok: false, msg: "User không tồn tại" });
+
+        // Kiểm tra nếu đang trong phiên đào 6h
+        if (user.isMining && user.miningStartedAt) {
+            const now = new Date();
+            const diffMs = now - new Date(user.miningStartedAt);
+            const diffHours = diffMs / (1000 * 60 * 60);
+            
+            if (diffHours < MINING_SESSION_HOURS) {
+                return res.json({ ok: false, msg: "Máy đang hoạt động, vui lòng đợi hết phiên!" });
+            }
         }
+
+        // TÍNH TOÁN XU CỦA 6 TIẾNG VÀ CỘNG TRỰC TIẾP
+        const secondsInSession = MINING_SESSION_HOURS * 60 * 60; // 21600 giây
+        const reward = Math.floor(user.miningRate * secondsInSession);
+
+        user.totalCoins += reward;
+        user.isMining = true;
+        user.miningStartedAt = new Date();
+
         await user.save();
-        res.json({ ok: true });
+
+        res.json({ 
+            ok: true, 
+            msg: `Đã cộng +${reward.toLocaleString()} Xu!`,
+            reward: reward,
+            totalCoins: user.totalCoins,
+            miningStartedAt: user.miningStartedAt
+        });
     } catch (e) { res.json({ ok: false }); }
 });
 
-app.post('/api/mining-sync', async (req, res) => {
-    const { id, addedCoins } = req.body;
-    try {
-        const user = await User.findOne({ telegramId: id.toString() });
-        if (!user || !user.isMining) return res.json({ ok: false });
-        
-        // Chống hack: Giới hạn tối đa nhận được trong 10-15s
-        if (addedCoins > (user.miningRate * 20)) return res.json({ ok: false });
-
-        user.totalCoins += addedCoins;
-        await user.save();
-        res.json({ ok: true, totalCoins: user.totalCoins });
-    } catch (e) { res.json({ ok: false }); }
-});
+// Logic xóa bỏ mining-sync vì tiền đã cộng ngay từ đầu
+app.post('/api/mining-sync', (req, res) => res.json({ ok: true })); 
 
 // ==========================================
 // 9. RÚT TIỀN & ADMIN
