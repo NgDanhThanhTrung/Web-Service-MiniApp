@@ -6,17 +6,25 @@ const path = require('path');
 const app = express();
 const { ADMIN_PASS, BOT_USERNAME, MONGODB_URI } = process.env;
 
-// --- CẤU HÌNH QUY ƯỚC KINH TẾ ---
-const EXCHANGE_RATE = 20000; // 20,000 Xu = 1 VNĐ
+// ==========================================
+// 1. CẤU HÌNH QUY ƯỚC KINH TẾ & NÂNG CẤP
+// ==========================================
+const EXCHANGE_RATE = 20000;       // 20,000 Xu = 1 VNĐ
+const XU_PER_DIAMOND_BUY = 2000;   // 2,000 Xu đổi được 1 💎
+const XU_PER_DIAMOND_SELL = 1500;  // 1 💎 đổi lại được 1,500 Xu
+const UPGRADE_COST_DIAMOND = 100;  // Phí cố định 100 💎 mỗi lần lên cấp
+const RATE_INCREASE_PER_LEVEL = 0.2; // Tăng 1 cấp tốc độ tăng thêm 0.2 xu/s
 
-// --- KẾT NỐI MONGODB ---
+// ==========================================
+// 2. KẾT NỐI DATABASE MONGODB
+// ==========================================
 mongoose.connect(MONGODB_URI)
-    .then(() => console.log('✅ Hệ thống đã kết nối Database MongoDB (Kinh tế 2.0)'))
-    .catch(err => console.error('❌ Lỗi kết nối DB:', err));
+    .then(() => console.log('✅ Hệ thống đã kết nối Database MongoDB thành công'))
+    .catch(err => console.error('❌ Lỗi kết nối Database:', err));
 
 const User = require('./models/User');
 
-// --- SCHEMA RÚT TIỀN ---
+// --- SCHEMA LƯU TRỮ YÊU CẦU RÚT TIỀN ---
 const WithdrawSchema = new mongoose.Schema({
     userId: String,
     name: String,
@@ -28,11 +36,16 @@ const WithdrawSchema = new mongoose.Schema({
 });
 const Withdraw = mongoose.model('Withdraw', WithdrawSchema);
 
+// ==========================================
+// 3. CẤU HÌNH MIDDLEWARE
+// ==========================================
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- ĐIỀU HƯỚNG ---
+// ==========================================
+// 4. ĐIỀU HƯỚNG GIAO DIỆN (ROUTES)
+// ==========================================
 app.get(['/', '/app'], (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/account', (req, res) => res.sendFile(path.join(__dirname, 'public/admin.html')));
 
@@ -43,43 +56,39 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-// --- HÀM XỬ LÝ PHẦN THƯỞNG DÙNG CHUNG ---
+// ==========================================
+// 5. HỆ THỐNG QUẢNG CÁO (ADSGRAM CALLBACK)
+// ==========================================
 async function processAdReward(userId, type, amount) {
-    if (!userId) return { ok: false, msg: 'Missing userId' };
-    
-    const user = await User.findOne({ telegramId: userId.toString() });
-    if (!user) return { ok: false, msg: 'User not found' };
+    if (!userId) return { ok: false, msg: 'Thiếu userId' };
+    try {
+        const user = await User.findOne({ telegramId: userId.toString() });
+        if (!user) return { ok: false, msg: 'User không tồn tại' };
 
-    const now = new Date();
-    const today = now.toDateString();
+        const now = new Date();
+        const today = now.toDateString();
 
-    if (user.lastActiveDay !== today) {
-        user.dailyVideo = 0;
-        user.dailyInterstitial = 0;
-        user.dailyBanner = 0;
-        user.adsWatchedToday = 0;
-        user.lastActiveDay = today;
-    }
+        // Reset bộ đếm ngày mới
+        if (user.lastActiveDay !== today) {
+            user.dailyVideo = 0;
+            user.dailyInterstitial = 0;
+            user.dailyBanner = 0;
+            user.adsWatchedToday = 0;
+            user.lastActiveDay = today;
+        }
 
-    const limitKey = `daily${type.charAt(0).toUpperCase() + type.slice(1)}`; 
-    const cooldownKey = `last${type.charAt(0).toUpperCase() + type.slice(1)}`;
+        const limitKey = `daily${type.charAt(0).toUpperCase() + type.slice(1)}`;
+        if (user[limitKey] >= 15) return { ok: false, msg: 'Hôm nay đã xem hết lượt!' };
 
-    if (user[limitKey] >= 15) return { ok: false, msg: 'Hôm nay bạn đã xem hết lượt!' };
-    
-    if (user[cooldownKey] && (now - user[cooldownKey]) / 1000 < 5) {
-        return { ok: false, msg: 'Thao tác quá nhanh!' };
-    }
+        user.totalCoins = (user.totalCoins || 0) + amount;
+        user[limitKey] = (user[limitKey] || 0) + 1;
+        user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
 
-    user.totalCoins = (user.totalCoins || 0) + amount;
-    user[limitKey] = (user[limitKey] || 0) + 1;
-    user[cooldownKey] = now;
-    user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
-
-    await user.save();
-    return { ok: true };
+        await user.save();
+        return { ok: true };
+    } catch (e) { return { ok: false }; }
 }
 
-// --- API CALLBACK ADSGRAM ---
 app.get('/api/ads-rewarded', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'video', 250000);
     res.send(result.ok ? 'OK' : result.msg);
@@ -95,11 +104,12 @@ app.get('/api/ads-banner', async (req, res) => {
     res.send(result.ok ? 'OK' : result.msg);
 });
 
-// --- API USER STATUS (CẬP NHẬT QUY ĐỔI VNĐ) ---
+// ==========================================
+// 6. QUẢN LÝ NGƯỜI DÙNG & REALTIME
+// ==========================================
 app.post('/api/user-status', async (req, res) => {
     const { id, first_name, username } = req.body;
     if (!id) return res.status(400).send("Missing ID");
-    
     try {
         let user = await User.findOne({ telegramId: id.toString() });
         const today = new Date().toDateString();
@@ -107,12 +117,13 @@ app.post('/api/user-status', async (req, res) => {
         if (!user) {
             user = new User({ 
                 telegramId: id.toString(), name: first_name, username: username || 'n/a', 
-                lastActiveDay: today, level: 1, totalCoins: 0, diamonds: 0 
+                lastActiveDay: today, level: 1, totalCoins: 0, diamonds: 0, miningRate: 12.0
             });
             await user.save();
         } else if (user.lastActiveDay !== today) {
-            user.adsWatchedToday = 0; user.dailyVideo = 0; user.dailyInterstitial = 0;
-            user.dailyBanner = 0; user.lastActiveDay = today;
+            user.adsWatchedToday = 0;
+            user.dailyVideo = 0; user.dailyInterstitial = 0; user.dailyBanner = 0;
+            user.lastActiveDay = today;
             await user.save();
         }
 
@@ -120,10 +131,8 @@ app.post('/api/user-status', async (req, res) => {
             ...user._doc,
             id: user.telegramId,
             coins: user.totalCoins,
-            vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE), // Quy đổi 20,000 : 1
-            first_name: user.name,
-            miningStatus: user.isMining,
-            miningTime: user.miningStartedAt
+            vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE),
+            miningStatus: user.isMining
         });
     } catch (e) { res.status(500).json(e); }
 });
@@ -144,54 +153,39 @@ app.post('/api/get-realtime-data', async (req, res) => {
         res.json({ 
             ok: true, 
             totalCoins: Math.floor(currentTotal),
-            vndEstimate: Math.floor(currentTotal / EXCHANGE_RATE), // Quy đổi realtime
+            vndEstimate: Math.floor(currentTotal / EXCHANGE_RATE),
             diamonds: user.diamonds 
         });
-    } catch (e) {
-        res.json({ ok: false });
-    }
+    } catch (e) { res.json({ ok: false }); }
 });
 
-app.post('/api/mining-tick', async (req, res) => {
-    const { id } = req.body;
+// ==========================================
+// 7. HỆ THỐNG KIM CƯƠNG & NÂNG CẤP
+// ==========================================
+app.post('/api/exchange-to-diamond', async (req, res) => {
+    const { id, amountDiamond } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        if (!user || !user.isMining) return res.json({ ok: false });
+        const cost = parseInt(amountDiamond) * XU_PER_DIAMOND_BUY;
+        if (user.totalCoins < cost) return res.json({ ok: false, msg: "Không đủ Xu!" });
 
-        const ratePerSecond = 12.0 + ((user.level || 1) - 1) * 0.2;
-        user.totalCoins += ratePerSecond;
+        user.totalCoins -= cost;
+        user.diamonds = (user.diamonds || 0) + parseInt(amountDiamond);
         await user.save();
-
-        res.json({ 
-            ok: true, 
-            currentTotal: Math.floor(user.totalCoins),
-            vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE)
-        });
-    } catch (e) { 
-        res.json({ ok: false }); 
-    }
+        res.json({ ok: true, coins: user.totalCoins, diamonds: user.diamonds });
+    } catch (e) { res.json({ ok: false }); }
 });
 
-app.post('/api/mining', async (req, res) => {
-    const { id, action } = req.body;
+app.post('/api/exchange-to-xu', async (req, res) => {
+    const { id, amountDiamond } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        if (!user) return res.json({ ok: false, msg: "Lỗi người dùng" });
+        if (user.diamonds < amountDiamond) return res.json({ ok: false, msg: "Không đủ 💎" });
 
-        if (action === 'start') {
-            if (user.isMining) return res.json({ ok: false, msg: "Máy đang đào rồi!" });
-            user.isMining = true;
-            user.miningStartedAt = new Date();
-            await user.save();
-            return res.json({ ok: true });
-        }
-
-        if (action === 'claim') {
-            user.isMining = false;
-            user.miningStartedAt = null;
-            await user.save();
-            return res.json({ ok: true, coins: Math.floor(user.totalCoins) });
-        }
+        user.diamonds -= parseInt(amountDiamond);
+        user.totalCoins += (parseInt(amountDiamond) * XU_PER_DIAMOND_SELL);
+        await user.save();
+        res.json({ ok: true, coins: user.totalCoins, diamonds: user.diamonds });
     } catch (e) { res.json({ ok: false }); }
 });
 
@@ -199,55 +193,89 @@ app.post('/api/upgrade', async (req, res) => {
     const { id } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        const cost = 1000 + (user.level - 1) * 500; 
+        if ((user.diamonds || 0) < UPGRADE_COST_DIAMOND) {
+            return res.json({ ok: false, msg: `Cần ${UPGRADE_COST_DIAMOND} 💎 để nâng cấp!` });
+        }
 
-        if (user.diamonds < cost) return res.json({ ok: false, msg: `Cần ${cost} 💎` });
-
-        user.diamonds -= cost;
+        user.diamonds -= UPGRADE_COST_DIAMOND;
         user.level += 1;
+        // Cập nhật: Mỗi cấp tăng thêm 0.2 xu/s
+        user.miningRate = (user.miningRate || 12.0) + RATE_INCREASE_PER_LEVEL;
 
-        let bonusMsg = "";
+        let bonus = "";
         if ([10, 20, 30].includes(user.level)) {
             user.totalCoins += 250000;
-            bonusMsg = " + Thưởng 250,000 Xu!";
+            bonus = " + Thưởng 250k Xu!";
         }
 
         await user.save();
-        res.json({ ok: true, level: user.level, msg: "Lên cấp thành công" + bonusMsg });
+        res.json({ ok: true, level: user.level, miningRate: user.miningRate, msg: `Lên cấp ${user.level} thành công!${bonus}` });
     } catch (e) { res.json({ ok: false }); }
 });
 
+// ==========================================
+// 8. LOGIC ĐÀO (MINING)
+// ==========================================
+app.post('/api/mining', async (req, res) => {
+    const { id, action } = req.body;
+    try {
+        const user = await User.findOne({ telegramId: id.toString() });
+        if (action === 'start') {
+            user.isMining = true;
+            user.miningStartedAt = new Date();
+        } else {
+            user.isMining = false;
+            user.miningStartedAt = null;
+        }
+        await user.save();
+        res.json({ ok: true });
+    } catch (e) { res.json({ ok: false }); }
+});
+
+app.post('/api/mining-sync', async (req, res) => {
+    const { id, addedCoins } = req.body;
+    try {
+        const user = await User.findOne({ telegramId: id.toString() });
+        if (!user || !user.isMining) return res.json({ ok: false });
+        
+        // Chống hack: Giới hạn tối đa nhận được trong 10-15s
+        if (addedCoins > (user.miningRate * 20)) return res.json({ ok: false });
+
+        user.totalCoins += addedCoins;
+        await user.save();
+        res.json({ ok: true, totalCoins: user.totalCoins });
+    } catch (e) { res.json({ ok: false }); }
+});
+
+// ==========================================
+// 9. RÚT TIỀN & ADMIN
+// ==========================================
 app.post('/api/withdraw', async (req, res) => {
     const { id, amountXu, method, address } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        if (!user) return res.json({ ok: false, msg: "Lỗi xác thực" });
-
-        if ((user.adsWatchedToday || 0) < 15) {
-            return res.json({ ok: false, msg: `Cần xem đủ 15 QC hôm nay (${user.adsWatchedToday}/15)` });
-        }
-
-        const MIN_WITHDRAW = 4000000; // 4 triệu xu = 200k VNĐ
-        if (amountXu < MIN_WITHDRAW) return res.json({ ok: false, msg: "Tối thiểu 4.000.000 Xu" });
-        if (user.totalCoins < amountXu) return res.json({ ok: false, msg: "Số dư không đủ" });
+        if ((user.adsWatchedToday || 0) < 15) return res.json({ ok: false, msg: "Xem đủ 15 QC để rút" });
+        if (user.totalCoins < amountXu || amountXu < 4000000) return res.json({ ok: false, msg: "Sai hạn mức hoặc thiếu tiền" });
 
         user.totalCoins -= amountXu;
         await user.save();
-
-        const newRequest = new Withdraw({ userId: id.toString(), name: user.name, amountXu, method, address });
-        await newRequest.save();
+        await new Withdraw({ userId: id.toString(), name: user.name, amountXu, method, address }).save();
         res.json({ ok: true });
     } catch (e) { res.json({ ok: false }); }
 });
 
 app.get('/api/admin/all-data', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.sendStatus(403);
-    try {
-        const users = await User.find().sort({ totalCoins: -1 }).limit(100);
-        const withdraws = await Withdraw.find().sort({ createdAt: -1 });
-        res.json({ users, withdraws });
-    } catch (e) { res.status(500).send("Error"); }
+    const users = await User.find().sort({ totalCoins: -1 }).limit(100);
+    const withdraws = await Withdraw.find().sort({ createdAt: -1 });
+    res.json({ users, withdraws });
+});
+
+app.post('/api/admin/approve-withdraw', async (req, res) => {
+    if (req.body.pass !== ADMIN_PASS) return res.json({ ok: false });
+    await Withdraw.findByIdAndUpdate(req.body.id, { status: 'Đã thanh toán' });
+    res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server đang chạy tại cổng ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Hệ thống vận hành tại cổng ${PORT}`));
