@@ -57,7 +57,7 @@ app.get('/api/config', (req, res) => {
 });
 
 // ==========================================
-// 5. HỆ THỐNG QUẢNG CÁO
+// 5. HỆ THỐNG QUẢNG CÁO - CẬP NHẬT CỘNG TIỀN REALTIME
 // ==========================================
 async function processAdReward(userId, type, amount) {
     if (!userId) return { ok: false, msg: 'Thiếu userId' };
@@ -68,6 +68,7 @@ async function processAdReward(userId, type, amount) {
         const now = new Date();
         const today = now.toDateString();
 
+        // Reset bộ đếm ngày mới
         if (user.lastActiveDay !== today) {
             user.dailyVideo = 0;
             user.dailyInterstitial = 0;
@@ -79,28 +80,37 @@ async function processAdReward(userId, type, amount) {
         const limitKey = `daily${type.charAt(0).toUpperCase() + type.slice(1)}`;
         if (user[limitKey] >= 15) return { ok: false, msg: 'Hôm nay đã xem hết lượt!' };
 
+        // CỘNG XU VÀO DATABASE
         user.totalCoins = (user.totalCoins || 0) + amount;
         user[limitKey] = (user[limitKey] || 0) + 1;
         user.adsWatchedToday = (user.adsWatchedToday || 0) + 1;
 
         await user.save();
-        return { ok: true };
-    } catch (e) { return { ok: false }; }
+        
+        // Trả về dữ liệu chi tiết để Frontend cập nhật ngay lập tức
+        return { 
+            ok: true, 
+            totalCoins: user.totalCoins, 
+            diamonds: user.diamonds,
+            adsWatchedToday: user.adsWatchedToday,
+            reward: amount
+        };
+    } catch (e) { return { ok: false, msg: "Lỗi hệ thống" }; }
 }
 
 app.get('/api/ads-rewarded', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'video', 250000);
-    res.send(result.ok ? 'OK' : result.msg);
+    res.json(result); // Trả về JSON thay vì text đơn thuần
 });
 
 app.get('/api/ads-interstitial', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'interstitial', 100000);
-    res.send(result.ok ? 'OK' : result.msg);
+    res.json(result);
 });
 
 app.get('/api/ads-banner', async (req, res) => {
     const result = await processAdReward(req.query.userId, 'banner', 25000);
-    res.send(result.ok ? 'OK' : result.msg);
+    res.json(result);
 });
 
 // ==========================================
@@ -133,6 +143,16 @@ app.post('/api/user-status', async (req, res) => {
             vndEstimate: Math.floor(user.totalCoins / EXCHANGE_RATE)
         });
     } catch (e) { res.status(500).json(e); }
+});
+
+// Thêm endpoint phụ để client polling (nếu cần)
+app.post('/api/get-realtime-data', async (req, res) => {
+    try {
+        const user = await User.findOne({ telegramId: req.body.id.toString() });
+        if (user) {
+            res.json({ ok: true, totalCoins: user.totalCoins, diamonds: user.diamonds });
+        } else res.json({ ok: false });
+    } catch (e) { res.json({ ok: false }); }
 });
 
 // ==========================================
@@ -197,7 +217,6 @@ app.post('/api/start-mining', async (req, res) => {
         const user = await User.findOne({ telegramId: id.toString() });
         if (!user) return res.json({ ok: false, msg: "User không tồn tại" });
 
-        // Kiểm tra nếu đang trong phiên đào 6h
         if (user.isMining && user.miningStartedAt) {
             const now = new Date();
             const diffMs = now - new Date(user.miningStartedAt);
@@ -208,8 +227,7 @@ app.post('/api/start-mining', async (req, res) => {
             }
         }
 
-        // TÍNH TOÁN XU CỦA 6 TIẾNG VÀ CỘNG TRỰC TIẾP
-        const secondsInSession = MINING_SESSION_HOURS * 60 * 60; // 21600 giây
+        const secondsInSession = MINING_SESSION_HOURS * 60 * 60; 
         const reward = Math.floor(user.miningRate * secondsInSession);
 
         user.totalCoins += reward;
@@ -228,7 +246,6 @@ app.post('/api/start-mining', async (req, res) => {
     } catch (e) { res.json({ ok: false }); }
 });
 
-// Logic xóa bỏ mining-sync vì tiền đã cộng ngay từ đầu
 app.post('/api/mining-sync', (req, res) => res.json({ ok: true })); 
 
 // ==========================================
