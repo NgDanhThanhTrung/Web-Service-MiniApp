@@ -120,7 +120,6 @@ app.get('/api/ads-interstitial', async (req, res) => {
 });
 
 app.get('/api/ads-banner', async (req, res) => {
-    // Sửa lỗi xử lý phần cộng tiền Banner mượt mà hơn
     const result = await processAdReward(req.query.userId, 'banner', 25000);
     res.json(result);
 });
@@ -348,9 +347,13 @@ app.get('/api/admin/all-data', async (req, res) => {
 });
 
 app.post('/api/admin/approve-withdraw', async (req, res) => {
-    if (req.body.pass !== ADMIN_PASS) return res.json({ ok: false });
-    await Withdraw.findByIdAndUpdate(req.body.id, { status: 'Đã thanh toán' });
-    res.json({ ok: true });
+    if (req.body.pass !== ADMIN_PASS) return res.json({ ok: false, msg: "Sai mật khẩu Admin!" });
+    try {
+        await Withdraw.findByIdAndUpdate(req.body.id, { status: 'Đã thanh toán' });
+        res.json({ ok: true });
+    } catch (e) {
+        res.json({ ok: false, msg: "Lỗi hệ thống khi duyệt lệnh." });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
