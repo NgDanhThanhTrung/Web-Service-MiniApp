@@ -7,8 +7,22 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
-        :root { --gold: #f1b90c; --bg: #0b0e11; --card: #1e2329; --blue: #3b82f6; --green: #0ecb81; --diamond: #00d2ff; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; -webkit-user-select: none; }
+        :root { 
+            --gold: #f1b90c; 
+            --bg: #0b0e11; 
+            --card: #1e2329; 
+            --blue: #3b82f6; 
+            --green: #0ecb81; 
+            --diamond: #00d2ff; 
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            margin: 0; 
+            padding: 15px; 
+            -webkit-user-select: none; 
+        }
         .header { text-align: center; margin-bottom: 20px; }
         .user-info { color: var(--gold); font-size: 14px; margin-bottom: 10px; font-weight: bold; }
         .balance-card { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
@@ -63,7 +77,6 @@
                     <div id="mining-timer" style="font-size: 12px; color: #848e9c; margin-bottom: 8px;">Đang kiểm tra máy đào...</div>
                     <button id="btn-mining" class="mining-btn" onclick="startMining()">BẮT ĐẦU ĐÀO (6H)</button>
                     <p style="font-size: 10px; color: #555; margin-top: 5px;">Thưởng phiên: <span id="mining-rate">...</span> XU</p>
-                    
                     <button onclick="upgradeLevel()" style="margin-top: 10px; background: none; border: 1px solid var(--blue); color: var(--blue); padding: 5px 15px; border-radius: 10px; font-size: 11px;">NÂNG CẤP (100 💎)</button>
                 </div>
 
@@ -154,17 +167,15 @@
             document.getElementById('u-name').innerText = rawUser.first_name;
             document.getElementById('ref-link').value = `https://t.me/MiniApp_NgDanhThanhTrung_Bot/app?startapp=${rawUser.id}`;
     
-    // Gọi hàm load banner
+            // Tải quảng cáo banner
             loadBanner();
     
-    // Gọi update UI
+            // Cập nhật giao diện người dùng
             await updateUI();
     
-    // Giữ lại hàm cập nhật đồng hồ
+            // Thiết lập chu kỳ cập nhật đồng hồ đếm ngược mỗi giây
             setInterval(updateMiningTimer, 1000);
         }
-
-// XÓA HẾT ĐOẠN ĐỊNH NGHĨA INIT LẦN THỨ 2 Ở CUỐI FILE ĐI
 
         async function updateUI() {
             try {
@@ -185,13 +196,13 @@
                 const sessionReward = userData.miningRate * 21600;
                 document.getElementById('mining-rate').innerText = sessionReward.toLocaleString();
                 
-                // Thanh quảng cáo
+                // Cập nhật thanh tiến trình xem quảng cáo
                 const ads = userData.adsWatchedToday || 0;
                 document.getElementById('count-ads').innerText = ads;
                 document.getElementById('bar-fill').style.width = Math.min((ads / 15) * 100, 100) + '%';
                 
                 updateMiningTimer();
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Lỗi cập nhật UI:", e); }
         }
 
         function updateMiningTimer() {
@@ -247,7 +258,6 @@
             }
         }
 
-        // --- Các hàm hỗ trợ khác (Quy đổi, Ads, Rút tiền) giữ nguyên ---
         function calcEx(type) {
             const val = type === 'buy' ? document.getElementById('buy-dm').value : document.getElementById('sell-dm').value;
             const rate = type === 'buy' ? 2000 : 1500;
@@ -261,28 +271,36 @@
             
             tg.showConfirm(`Xác nhận giao dịch?`, async (ok) => {
                 if(!ok) return;
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ id: rawUser.id, amountDiamond: parseInt(amount) })
-                });
-                const r = await res.json();
-                if(r.ok) {
-                    tg.showAlert("✅ Giao dịch hoàn tất!");
-                    updateUI();
-                } else tg.showAlert(r.msg);
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ id: rawUser.id, amountDiamond: parseInt(amount) })
+                    });
+                    const r = await res.json();
+                    if(r.ok) {
+                        tg.showAlert("✅ Giao dịch hoàn tất!");
+                        updateUI();
+                    } else tg.showAlert(r.msg);
+                } catch (e) {
+                    tg.showAlert("Lỗi hệ thống khi giao dịch!");
+                }
             });
         }
 
         async function upgradeLevel() {
-            const res = await fetch('/api/upgrade', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: rawUser.id })
-            });
-            const r = await res.json();
-            tg.showAlert(r.msg);
-            updateUI();
+            try {
+                const res = await fetch('/api/upgrade', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: rawUser.id })
+                });
+                const r = await res.json();
+                tg.showAlert(r.msg);
+                updateUI();
+            } catch (e) {
+                tg.showAlert("Lỗi nâng cấp hệ thống!");
+            }
         }
 
         function triggerAd(type) {
@@ -290,7 +308,7 @@
             const AdController = window.Adsgram.init({ blockId: ADS_CONFIG[type], params: { userId: rawUser.id.toString() } });
             AdController.show().then(() => {
                 setTimeout(updateUI, 2000);
-            }).catch(e => console.error(e));
+            }).catch(e => console.error("Lỗi khi tải quảng cáo:", e));
         }
 
         async function requestWithdraw() {
@@ -299,16 +317,21 @@
             const method = document.getElementById('w-method').value;
             if (amount < 4000000) return tg.showAlert("Tối thiểu rút 4.000.000 XU!");
             if (!info) return tg.showAlert("Vui lòng điền thông tin nhận tiền!");
-            const res = await fetch('/api/withdraw', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: rawUser.id, amountXu: parseInt(amount), method, address: info })
-            });
-            const r = await res.json();
-            if (r.ok) {
-                tg.showAlert("🚀 Đã gửi yêu cầu rút tiền thành công!");
-                updateUI();
-            } else tg.showAlert(r.msg);
+            
+            try {
+                const res = await fetch('/api/withdraw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: rawUser.id, amountXu: parseInt(amount), method, address: info })
+                });
+                const r = await res.json();
+                if (r.ok) {
+                    tg.showAlert("🚀 Đã gửi yêu cầu rút tiền thành công!");
+                    updateUI();
+                } else tg.showAlert(r.msg);
+            } catch (e) {
+                tg.showAlert("Gặp lỗi khi gửi yêu cầu rút tiền!");
+            }
         }
 
         function openTab(evt, name) {
@@ -325,27 +348,29 @@
             document.execCommand('copy');
             tg.showAlert("📋 Đã sao chép link mời!");
         }
-        function loadBanner() {
-    // Kiểm tra xem Adsgram đã tải xong chưa
-    if (typeof window.Adsgram === 'undefined') {
-        console.log("Adsgram chưa sẵn sàng, chờ 2 giây...");
-        setTimeout(loadBanner, 2000); 
-        return;
-    }
 
-    const banner = window.Adsgram.init({ 
-        blockId: ADS_CONFIG.banner, 
-        params: { userId: rawUser.id.toString() } 
-    });
-    
-    banner.render("banner-ad-box")
-        .then(() => console.log("Banner đã hiển thị thành công"))
-        .catch(e => {
-            console.error("Lỗi hiển thị banner:", e);
-            document.getElementById("banner-ad-box").style.display = "none"; // Ẩn khung nếu lỗi
-        });
-}
-        init();
+        function loadBanner() {
+            if (typeof window.Adsgram === 'undefined') {
+                console.log("Adsgram chưa sẵn sàng, chờ 2 giây...");
+                setTimeout(loadBanner, 2000); 
+                return;
+            }
+
+            const banner = window.Adsgram.init({ 
+                blockId: ADS_CONFIG.banner, 
+                params: { userId: rawUser.id.toString() } 
+            });
+            
+            banner.render("banner-ad-box")
+                .then(() => console.log("Banner đã hiển thị thành công"))
+                .catch(e => {
+                    console.error("Lỗi hiển thị banner:", e);
+                    document.getElementById("banner-ad-box").style.display = "none";
+                });
+        }
+
+        // Đảm bảo mã JavaScript khởi tạo chạy mượt mà ngay sau khi trang tải xong
+        window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
