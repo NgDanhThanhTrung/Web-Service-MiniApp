@@ -329,7 +329,7 @@ app.post('/api/withdraw', async (req, res) => {
     const { id, amountXu, method, address } = req.body;
     try {
         const user = await User.findOne({ telegramId: id.toString() });
-        if ((user.adsWatchedToday || 0) < 15) return res.json({ ok: false, msg: "Xem đủ 15 QC để rút" });
+        if ((user.adsWatchedToday || 0) < 5) return res.json({ ok: false, msg: "Xem đủ 5 QC để rút" });
         if (user.totalCoins < amountXu || amountXu < 4000000) return res.json({ ok: false, msg: "Sai hạn mức hoặc thiếu tiền" });
 
         user.totalCoins -= amountXu;
