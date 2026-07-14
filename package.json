@@ -1,13 +1,15 @@
 {
-  "name": "coin-app-b-direct",
-  "version": "2.0.0",
-  "main": "server.js",
+  "name": "farm-mining-web-service",
+  "version": "1.0.0",
+  "description": "Backend API & Game Interface for Farm Mining WebApp",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node src/server.js"
   },
   "dependencies": {
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mongoose": "^8.4.1",
-    "cors": "^2.8.5"
+    "mongoose": "^8.4.1"
   }
 }
